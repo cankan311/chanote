@@ -2610,10 +2610,13 @@ function renderPartnerList(){
   var el=document.getElementById('partner-list'); if(!el) return;
   var list=partners.filter(function(p){return partnerFilter==='all'||p.type===partnerFilter;});
   if(!list.length){el.innerHTML='<div class="empty-state"><span class="empty-ico">🏪</span>取引先がありません</div>';initPartnerDrag();return;}
-  el.innerHTML='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;padding-left:2px;">≡ を長押し → 上下にドラッグで並び替え</div>'+list.map(function(p){
+  el.innerHTML='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;padding-left:2px;">▲▼ で並び替え（≡ を長押し→ドラッグでもOK）</div>'+list.map(function(p){
     var cnt=trades.filter(function(t){return t.producerId===p.id||t.buyerId===p.id;}).length;
     var badge=p.type==='producer'?'<span class="badge badge-producer">生産家</span>':'<span class="badge badge-buyer">茶商</span>';
-    return '<div class="partner-card" data-id="'+p.id+'" onclick="showPartnerDetail('+p.id+')" style="touch-action:pan-y;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;"><span style="color:var(--hint);font-size:17px;line-height:1;">≡</span>'+p.name+'</span>'+badge+'</div><div style="font-size:12px;color:var(--muted);padding-left:25px;">取引 '+cnt+'件'+(p.notes?' ｜ '+p.notes:'')+'</div></div>';
+    var arrows='<span style="display:inline-flex;flex-direction:column;gap:2px;margin-left:4px;">'
+      +'<button onclick="event.stopPropagation();movePartner('+p.id+',-1)" style="width:30px;height:22px;border:1px solid var(--border2);background:var(--surface);border-radius:6px;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:0;">▲</button>'
+      +'<button onclick="event.stopPropagation();movePartner('+p.id+',1)" style="width:30px;height:22px;border:1px solid var(--border2);background:var(--surface);border-radius:6px;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:0;">▼</button></span>';
+    return '<div class="partner-card" data-id="'+p.id+'" onclick="showPartnerDetail('+p.id+')" style="touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;flex:1;min-width:0;"><span style="color:var(--hint);font-size:17px;line-height:1;">≡</span><span style="overflow:hidden;text-overflow:ellipsis;">'+p.name+'</span></span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'+badge+arrows+'</span></div><div style="font-size:12px;color:var(--muted);padding-left:25px;">取引 '+cnt+'件'+(p.notes?' ｜ '+p.notes:'')+'</div></div>';
   }).join('');
   initPartnerDrag();
 }
@@ -4943,6 +4946,7 @@ function initPartnerDrag(){
   var cont=document.getElementById('partner-list');
   if(!cont || cont.dataset.dragInit==='1') return;
   cont.dataset.dragInit='1';
+  cont.addEventListener('contextmenu',function(e){ e.preventDefault(); });
   cont.addEventListener('touchstart',function(e){
     _suppressPartnerClick=false;
     var card=e.target.closest?e.target.closest('.partner-card'):null;
@@ -4989,8 +4993,23 @@ function initPartnerDrag(){
   cont.addEventListener('touchend',endDrag);
   cont.addEventListener('touchcancel',endDrag);
 }
-function persistPartnerOrder(){
-  var cont=document.getElementById('partner-list'); if(!cont) return;
+function movePartner(id, dir){
+  var list=partners.filter(function(p){return partnerFilter==='all'||p.type===partnerFilter;});
+  var idx=-1; for(var i=0;i<list.length;i++){ if(list[i].id===id){ idx=i; break; } }
+  var j=idx+dir;
+  if(idx<0||j<0||j>=list.length) return;
+  var tmp=list[idx]; list[idx]=list[j]; list[j]=tmp;
+  var visIds=list.map(function(p){return p.id;});
+  var visset={}; visIds.forEach(function(x){visset[x]=1;});
+  var queue=visIds.slice();
+  var result=[];
+  partners.forEach(function(p){
+    if(visset[p.id]){ var nid=queue.shift(); var np=partners.find(function(x){return x.id===nid;}); if(np) result.push(np); }
+    else result.push(p);
+  });
+  if(result.length===partners.length){ partners=result; save(); renderPartnerList(); renderPartnerSelects(); }
+}
+function persistPartnerOrder(){  var cont=document.getElementById('partner-list'); if(!cont) return;
   var newVisible=Array.prototype.slice.call(cont.querySelectorAll('.partner-card')).map(function(c){return Number(c.dataset.id);});
   if(!newVisible.length) return;
   var visset={}; newVisible.forEach(function(id){visset[id]=1;});
