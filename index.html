@@ -1114,6 +1114,18 @@ body{
         </div>
         <textarea id="memo-body" placeholder="メモを入力（録音ボタンで音声入力も可）..." style="width:100%;padding:12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;height:120px;resize:vertical;line-height:1.7;"></textarea>
       </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:6px;">添付（写真・画像・ファイル）</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="document.getElementById('memo-cam').click()" style="padding:8px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--matcha-mid);background:var(--surface);color:var(--matcha);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">📷 写真を撮る</button>
+          <button onclick="document.getElementById('memo-img').click()" style="padding:8px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--matcha-mid);background:var(--surface);color:var(--matcha);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">🖼 画像を添付</button>
+          <button onclick="document.getElementById('memo-file').click()" style="padding:8px 12px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid var(--matcha-mid);background:var(--surface);color:var(--matcha);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">📎 ファイル</button>
+        </div>
+        <input id="memo-cam"  type="file" accept="image/*" capture="environment" style="display:none;" onchange="addMemoAttachment(this,'image')">
+        <input id="memo-img"  type="file" accept="image/*" multiple style="display:none;" onchange="addMemoAttachment(this,'image')">
+        <input id="memo-file" type="file" multiple style="display:none;" onchange="addMemoAttachment(this,'file')">
+        <div id="memo-attach-preview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"></div>
+      </div>
       <button id="memo-save-btn" onclick="saveMemo()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:var(--radius-sm);background:#ff9800;color:#fff;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">💾 メモを保存</button>
     </div>
     <!-- メモ一覧 -->
@@ -1825,6 +1837,7 @@ function saveMemos(){
 function openMemoModal(){
   loadMemos();
   _editingMemoId=null;
+  _memoAttachments=[]; renderMemoAttachPreview();
   var sb=document.getElementById('memo-save-btn'); if(sb) sb.innerHTML='💾 メモを保存';
   var modal = document.getElementById('memo-modal');
   if(modal){ modal.style.display='flex'; }
@@ -1855,36 +1868,44 @@ function toggleMemoTag(btn, tag){
 function saveMemo(){
   var date = (document.getElementById('memo-date')||{value:''}).value;
   var body = (document.getElementById('memo-body')||{value:''}).value.trim();
-  if(!body){ toast('メモ内容を入力してください'); return; }
+  var atts = _memoAttachments.slice();
+  if(!body && !atts.length){ toast('メモ内容か写真・ファイルを入力してください'); return; }
   var tags = [];
   document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
     if(btn.dataset.active==='1') tags.push(btn.dataset.tag);
   });
   var key = date || '_nodate';
+  var prevState = JSON.stringify(quickMemos);
   if(_editingMemoId!==null){
-    // 既存メモを更新（日付が変わった場合は移動）
     var eid=Number(_editingMemoId), createdAt=new Date().toISOString();
     Object.keys(quickMemos).forEach(function(k){
       var arr=quickMemos[k]||[];
       for(var i=arr.length-1;i>=0;i--){ if(arr[i].id===eid){ if(arr[i].createdAt) createdAt=arr[i].createdAt; arr.splice(i,1); } }
     });
     if(!quickMemos[key]) quickMemos[key]=[];
-    quickMemos[key].unshift({id:eid, date:date, tags:tags, body:body, createdAt:createdAt});
-    toast('メモを更新しました');
+    quickMemos[key].unshift({id:eid, date:date, tags:tags, body:body, attachments:atts, createdAt:createdAt});
   } else {
     if(!quickMemos[key]) quickMemos[key]=[];
-    quickMemos[key].unshift({id:Date.now(), date:date, tags:tags, body:body, createdAt:new Date().toISOString()});
-    toast('メモを保存しました');
+    quickMemos[key].unshift({id:Date.now(), date:date, tags:tags, body:body, attachments:atts, createdAt:new Date().toISOString()});
   }
-  saveMemos();
+  try{
+    saveMemos();
+  }catch(err){
+    quickMemos = JSON.parse(prevState);
+    alert('保存できませんでした。写真やファイルの容量が大きすぎる可能性があります。\n枚数を減らすか、小さい画像にしてからもう一度お試しください。');
+    return;
+  }
+  var wasEdit=_editingMemoId!==null;
   loadMemos();
-  // フォームリセット
   _editingMemoId=null;
+  _memoAttachments=[];
+  renderMemoAttachPreview();
   var sb=document.getElementById('memo-save-btn'); if(sb) sb.innerHTML='💾 メモを保存';
   var b=document.getElementById('memo-body'); if(b) b.value='';
   document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
     btn.dataset.active=''; btn.style.background='var(--surface)'; btn.style.color='var(--muted)'; btn.style.borderColor='var(--border2)';
   });
+  toast(wasEdit?'メモを更新しました':'メモを保存しました');
   renderMemoList();
   renderCalendar();
 }
@@ -1919,7 +1940,7 @@ function renderMemoList(){
       +'<button onclick="deleteMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">削除</button>'
       +'</div>'
       +'</div>'
-      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+escText(m.body)+'</div>'
+      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+escText(m.body)+'</div>'+memoAttachHtml(m)
       +'</div>';
   }).join('');
 }
@@ -2005,7 +2026,7 @@ function renderActivityCheck(){
   if(dayMemos.length){
     html += '<div class="section-label" style="margin-top:8px;">📝 この日のメモ</div>';
     dayMemos.forEach(function(m){
-      html += '<div class="card" style="margin-bottom:8px;padding:10px 14px;font-size:13px;color:var(--ink);white-space:pre-wrap;">'+escText(m.body)+'</div>';
+      html += '<div class="card" style="margin-bottom:8px;padding:10px 14px;font-size:13px;color:var(--ink);white-space:pre-wrap;">'+escText(m.body)+'</div>'+memoAttachHtml(m);
     });
   }
 
@@ -4908,6 +4929,7 @@ function editMemo(id){
   _editingMemoId=eid;
   var dt=document.getElementById('memo-date'); if(dt) dt.value=memo.date||'';
   var b=document.getElementById('memo-body'); if(b) b.value=memo.body||'';
+  _memoAttachments=(memo.attachments||[]).slice(); renderMemoAttachPreview();
   document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
     var on=(memo.tags||[]).indexOf(btn.dataset.tag)>=0;
     btn.dataset.active=on?'1':'';
@@ -4931,7 +4953,7 @@ function renderDayMemos(date){
       +'<button onclick="editMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 10px;border-radius:8px;border:1px solid var(--matcha-mid);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">編集</button>'
       +'<button onclick="deleteMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">削除</button>'
       +'</div></div>'
-      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+escText(m.body)+'</div>'
+      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+escText(m.body)+'</div>'+memoAttachHtml(m)
       +'</div>';
   }).join('');
   return h;
@@ -5133,6 +5155,67 @@ async function applyJmaForecast(mkey){
     weatherCache[d]=merged;
     monthWeather[d]={icon:m.icon, hasRain:hasRain, isForecast:true};
   });
+}
+
+/* ===== メモ添付（写真・画像・ファイル） ===== */
+var _memoAttachments=[];
+function addMemoAttachment(input, kind){
+  var files=input.files; if(!files||!files.length){ return; }
+  Array.prototype.slice.call(files).forEach(function(file){
+    if(file.type && file.type.indexOf('image/')===0){
+      _compressImage(file, function(dataUrl){
+        _memoAttachments.push({type:'image', name:file.name||'photo.jpg', mime:'image/jpeg', data:dataUrl});
+        renderMemoAttachPreview();
+      });
+    } else {
+      if(file.size > 3*1024*1024){ alert('「'+(file.name||'ファイル')+'」は大きすぎます（3MBまで）。'); return; }
+      var r=new FileReader();
+      r.onload=function(){ _memoAttachments.push({type:'file', name:file.name||'file', mime:file.type||'application/octet-stream', data:r.result}); renderMemoAttachPreview(); };
+      r.readAsDataURL(file);
+    }
+  });
+  input.value='';
+}
+function _compressImage(file, cb){
+  var img=new Image();
+  var url=URL.createObjectURL(file);
+  img.onload=function(){
+    var max=1200, w=img.width, h=img.height;
+    if(w>h && w>max){ h=Math.round(h*max/w); w=max; }
+    else if(h>=w && h>max){ w=Math.round(w*max/h); h=max; }
+    var c=document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);
+    try{ cb(c.toDataURL('image/jpeg',0.6)); }catch(e){ alert('画像の処理に失敗しました'); }
+  };
+  img.onerror=function(){ URL.revokeObjectURL(url); alert('画像の読み込みに失敗しました'); };
+  img.src=url;
+}
+function renderMemoAttachPreview(){
+  var el=document.getElementById('memo-attach-preview'); if(!el) return;
+  el.innerHTML=_memoAttachments.map(function(a,i){
+    if(a.type==='image'){
+      return '<div style="position:relative;"><img src="'+a.data+'" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);"><button onclick="removeMemoAttachment('+i+')" style="position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:none;background:#b83232;color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0;">✕</button></div>';
+    }
+    return '<div style="position:relative;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;max-width:170px;"><span style="font-size:16px;">📎</span><span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escText(a.name)+'</span><button onclick="removeMemoAttachment('+i+')" style="position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:none;background:#b83232;color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0;">✕</button></div>';
+  }).join('');
+}
+function removeMemoAttachment(i){ _memoAttachments.splice(i,1); renderMemoAttachPreview(); }
+function memoAttachHtml(m){
+  if(!m.attachments||!m.attachments.length) return '';
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+m.attachments.map(function(a){
+    if(a.type==='image'){
+      return '<img src="'+a.data+'" onclick="event.stopPropagation();openImageView(this.src)" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;">';
+    }
+    return '<a href="'+a.data+'" download="'+escAttr(a.name)+'" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--matcha);text-decoration:none;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📎 '+escText(a.name)+'</a>';
+  }).join('')+'</div>';
+}
+function openImageView(src){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:14px;';
+  ov.onclick=function(){ if(ov.parentNode) document.body.removeChild(ov); };
+  var img=document.createElement('img'); img.src=src; img.style.cssText='max-width:100%;max-height:100%;border-radius:8px;';
+  ov.appendChild(img); document.body.appendChild(ov);
 }
 
 load();
