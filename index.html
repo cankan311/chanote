@@ -2648,6 +2648,7 @@ function showPartnerDetail(id){
   }
   html+='<button onclick="mergePartnerStart('+p.id+')" style="width:100%;margin-top:16px;padding:13px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);background:var(--surface);color:var(--matcha);border:1.5px solid var(--matcha-mid);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🔗 別の取引先と統合する</button>';
   html+='<button class="btn-danger" onclick="deletePartner('+p.id+')">🗑 この取引先を削除する</button>';
+  document.getElementById('partner-detail-content').innerHTML=html;
   document.querySelectorAll('.screen,.detail-screen').forEach(function(s){s.classList.remove('active');});
   document.getElementById('screen-partner-detail').classList.add('active');
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
