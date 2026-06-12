@@ -519,6 +519,8 @@ body{
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -2133,6 +2135,8 @@ function ganttNextMonth(){
 
 function renderGanttMonth(){
   var el=document.getElementById('gantt-month-area'); if(!el) return;
+  var _oldSc=document.getElementById('gantt-scroll');
+  var _prevScroll=_oldSc?_oldSc.scrollLeft:0;
   var prods=partners.filter(function(p){return p.type==='producer';});
   var ym=ganttYm;
   var y=parseInt(ym.slice(0,4)), m=parseInt(ym.slice(5));
@@ -2151,7 +2155,7 @@ function renderGanttMonth(){
   // 天気を取得（非同期）
   fetchMonthWeather(y,m-1).then(function(){ renderGanttWeather(ym); });
 
-  var html='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">';
+  var html='<div id="gantt-scroll" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">';
   html+='<table style="border-collapse:collapse;font-size:10px;min-width:max-content;">';
 
   // 日付ヘッダー
@@ -2210,6 +2214,8 @@ function renderGanttMonth(){
   });
   html+='</table></div>';
   el.innerHTML=html;
+  var _sc=document.getElementById('gantt-scroll');
+  if(_sc&&_prevScroll) _sc.scrollLeft=_prevScroll;
 }
 
 function renderGanttWeather(ym){
@@ -3843,6 +3849,21 @@ function renderAnalyze(){
         });
         h+='</div>';
       }
+    } else if(id==='ovgraph'){
+      if(ftrades.length){
+        function ovBlock(title,canvasId,h2,extra){
+          return '<div class="card" style="margin-bottom:14px;">'
+            +'<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;">'+title+'</div>'
+            +(extra||'')
+            +'<div style="position:relative;height:'+h2+'px;"><canvas id="'+canvasId+'"></canvas></div></div>';
+        }
+        h+='<div class="section-label">全体グラフ</div>';
+        h+=ovBlock('📈 日別 出荷量と平均単価','ov-daily',230,'<div style="font-size:10px;color:var(--hint);margin-bottom:6px;">棒＝数量(kg)　線＝平均単価(円/kg)　※ピンチでズーム</div>');
+        h+=ovBlock('🥧 売り先別 金額シェア','ov-share',230);
+        h+=ovBlock('🏆 生産家別 平均単価 TOP10','ov-prodprice',260);
+        h+=ovBlock('🌿 品種別 数量・金額','ov-variety',230);
+        h+=ovBlock('📦 累積出荷量の推移','ov-cumu',220,'<div style="font-size:10px;color:var(--hint);margin-bottom:6px;">茶期の進み具合がひと目で分かります</div>');
+      }
     } else if(id==='pgraph'){
       if(producers.length&&ftrades.length){
         h+='<div class="section-label">生産家別 価格・数量グラフ</div>';
@@ -3919,7 +3940,7 @@ function renderAnalyze(){
   // タブ別のセクション割り当て
   var TAB_SECTIONS = {
     summary:  ['summary','komisyon','pavgqty','buyer'],
-    graph:    ['pgraph'],
+    graph:    ['ovgraph','pgraph'],
     forecast: ['forecast','pfore','opstats'],
   };
   var visibleIds = TAB_SECTIONS[analyzeTab] || TAB_SECTIONS.summary;
@@ -3949,6 +3970,7 @@ function renderAnalyze(){
   });
 
   el.innerHTML=html;
+  if(analyzeTab==='graph' && ftrades.length) setTimeout(function(){renderOverviewCharts();},50);
   if(analyzeTab==='graph' && producers.length&&ftrades.length) setTimeout(function(){renderProducerCharts();},50);
 }
 
@@ -5323,6 +5345,110 @@ function undoDelete(){
   var bar=document.getElementById('undo-bar'); if(bar) bar.style.display='none';
   loadMemos(); renderAll(); renderCalendar();
   toast('元に戻しました');
+}
+
+/* ===== 全体グラフ（5種） ===== */
+var _ovCharts=[];
+function _ovDestroy(){ _ovCharts.forEach(function(c){ try{c.destroy();}catch(e){} }); _ovCharts=[]; }
+var OV_PALETTE=['#3a6b45','#c89b3c','#5b8db8','#b85c5c','#7a6bb8','#5cab9b','#c97f4f','#8aa84f','#b85c93','#6b7280'];
+function renderOverviewCharts(){
+  if(typeof Chart==='undefined') return;
+  _ovDestroy();
+  var ftrades=getFilteredTrades();
+  if(!ftrades.length) return;
+  var jpFont={family:"'Noto Sans JP',sans-serif"};
+  var baseOpts={responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},
+      tooltip:{backgroundColor:'rgba(22,20,18,0.92)',titleColor:'#b0a898',bodyColor:'#fff',padding:10,titleFont:{size:11},bodyFont:{size:12,weight:'bold'}}},
+    scales:{x:{ticks:{maxRotation:0,font:{size:10},color:'#a8a098'},grid:{display:false}},
+            y:{ticks:{font:{size:10},color:'#a8a098'},grid:{color:'rgba(0,0,0,0.05)'},beginAtZero:true}}};
+
+  // --- 1) 日別 数量＋平均単価 ---
+  var byDate={};
+  ftrades.forEach(function(t){ if(!t.date)return; if(!byDate[t.date])byDate[t.date]={qty:0,amt:0}; byDate[t.date].qty+=(t.totalQty||0); byDate[t.date].amt+=tradeAmount(t); });
+  var dts=Object.keys(byDate).sort();
+  var c1=document.getElementById('ov-daily');
+  if(c1&&dts.length){
+    _ovCharts.push(new Chart(c1,{type:'bar',
+      data:{labels:dts.map(function(d){return d.slice(5);}),
+        datasets:[
+          {type:'bar',label:'数量',data:dts.map(function(d){return Math.round(byDate[d].qty);}),backgroundColor:'rgba(58,107,69,0.55)',borderRadius:6,maxBarThickness:22,yAxisID:'y'},
+          {type:'line',label:'平均単価',data:dts.map(function(d){return byDate[d].qty>0?Math.round(byDate[d].amt/byDate[d].qty):null;}),borderColor:'#c89b3c',backgroundColor:'rgba(200,155,60,0.15)',pointBackgroundColor:'#fff',pointBorderColor:'#c89b3c',pointRadius:3,tension:0.35,yAxisID:'y2',spanGaps:true}
+        ]},
+      options:Object.assign({},baseOpts,{
+        interaction:{mode:'index',intersect:false},
+        plugins:Object.assign({},baseOpts.plugins,{
+          legend:{display:true,labels:{font:Object.assign({size:11},jpFont),boxWidth:14}},
+          zoom:{pan:{enabled:true,mode:'x'},zoom:{pinch:{enabled:true},wheel:{enabled:true},mode:'x'}},
+          tooltip:Object.assign({},baseOpts.plugins.tooltip,{callbacks:{label:function(ctx){var v=ctx.parsed.y;if(v==null)return null;return ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y2'?v.toLocaleString()+'円/kg':fmt(v)+'kg');}}})
+        }),
+        scales:{x:baseOpts.scales.x,
+          y:Object.assign({},baseOpts.scales.y,{position:'left',title:{display:true,text:'kg',font:{size:9}}}),
+          y2:{position:'right',beginAtZero:false,grid:{display:false},ticks:{font:{size:10},color:'#c89b3c',callback:function(v){return v.toLocaleString();}},title:{display:true,text:'円/kg',font:{size:9}}}}
+      })}));
+  }
+
+  // --- 2) 売り先別 金額シェア（ドーナツ） ---
+  var byBuyer={};
+  ftrades.forEach(function(t){ var b=partners.find(function(p){return p.id===t.buyerId;}); var nm=b?b.name:'売先未設定'; byBuyer[nm]=(byBuyer[nm]||0)+tradeAmount(t); });
+  var bNames=Object.keys(byBuyer).sort(function(a,b){return byBuyer[b]-byBuyer[a];});
+  var c2=document.getElementById('ov-share');
+  if(c2&&bNames.length){
+    _ovCharts.push(new Chart(c2,{type:'doughnut',
+      data:{labels:bNames,datasets:[{data:bNames.map(function(n){return Math.round(byBuyer[n]);}),backgroundColor:bNames.map(function(_,i){return OV_PALETTE[i%OV_PALETTE.length];}),borderColor:'#faf7f2',borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+        plugins:{legend:{position:'right',labels:{font:Object.assign({size:11},jpFont),boxWidth:12,padding:8}},
+          tooltip:{callbacks:{label:function(ctx){var tot=ctx.dataset.data.reduce(function(a,b){return a+b;},0);var pct=tot?Math.round(ctx.parsed/tot*100):0;return ' '+ctx.label+': '+ctx.parsed.toLocaleString()+'円（'+pct+'%）';}}}}}}));
+  }
+
+  // --- 3) 生産家別 平均単価 TOP10（横棒） ---
+  var byProd={};
+  ftrades.forEach(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); var nm=p?p.name:'—'; if(!byProd[nm])byProd[nm]={qty:0,amt:0}; byProd[nm].qty+=(t.totalQty||0); byProd[nm].amt+=tradeAmount(t); });
+  var pNames=Object.keys(byProd).filter(function(n){return byProd[n].qty>0;})
+    .sort(function(a,b){return (byProd[b].amt/byProd[b].qty)-(byProd[a].amt/byProd[a].qty);}).slice(0,10);
+  var c3=document.getElementById('ov-prodprice');
+  if(c3&&pNames.length){
+    _ovCharts.push(new Chart(c3,{type:'bar',
+      data:{labels:pNames,datasets:[{data:pNames.map(function(n){return Math.round(byProd[n].amt/byProd[n].qty);}),backgroundColor:pNames.map(function(_,i){return i===0?'#c89b3c':'rgba(58,107,69,0.65)';}),borderRadius:6,maxBarThickness:20}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ' 平均 '+ctx.parsed.x.toLocaleString()+'円/kg（'+fmt(byProd[ctx.label].qty)+'kg）';}}}},
+        scales:{x:{ticks:{font:{size:10},color:'#a8a098',callback:function(v){return v.toLocaleString();}},grid:{color:'rgba(0,0,0,0.05)'},beginAtZero:true},
+                y:{ticks:{font:Object.assign({size:11},jpFont),color:'#5a564e'},grid:{display:false}}}}}));
+  }
+
+  // --- 4) 品種別 数量・金額 ---
+  var byVar={};
+  ftrades.forEach(function(t){ var v=t.variety||'品種不明'; if(!byVar[v])byVar[v]={qty:0,amt:0}; byVar[v].qty+=(t.totalQty||0); byVar[v].amt+=tradeAmount(t); });
+  var vNames=Object.keys(byVar).sort(function(a,b){return byVar[b].qty-byVar[a].qty;}).slice(0,8);
+  var c4=document.getElementById('ov-variety');
+  if(c4&&vNames.length){
+    _ovCharts.push(new Chart(c4,{type:'bar',
+      data:{labels:vNames,datasets:[
+        {label:'数量(kg)',data:vNames.map(function(n){return Math.round(byVar[n].qty);}),backgroundColor:'rgba(58,107,69,0.65)',borderRadius:6,maxBarThickness:24,yAxisID:'y'},
+        {label:'金額(万円)',data:vNames.map(function(n){return Math.round(byVar[n].amt/10000);}),backgroundColor:'rgba(200,155,60,0.65)',borderRadius:6,maxBarThickness:24,yAxisID:'y2'}]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:true,labels:{font:Object.assign({size:11},jpFont),boxWidth:14}},
+          tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+ctx.parsed.y.toLocaleString();}}}},
+        scales:{x:{ticks:{font:Object.assign({size:10},jpFont),color:'#5a564e',maxRotation:30},grid:{display:false}},
+                y:{position:'left',beginAtZero:true,ticks:{font:{size:10},color:'#3a6b45'},grid:{color:'rgba(0,0,0,0.05)'}},
+                y2:{position:'right',beginAtZero:true,grid:{display:false},ticks:{font:{size:10},color:'#c89b3c'}}}}}));
+  }
+
+  // --- 5) 累積出荷量 ---
+  var c5=document.getElementById('ov-cumu');
+  if(c5&&dts.length){
+    var cum=0;
+    var cumData=dts.map(function(d){ cum+=byDate[d].qty; return Math.round(cum); });
+    _ovCharts.push(new Chart(c5,{type:'line',
+      data:{labels:dts.map(function(d){return d.slice(5);}),
+        datasets:[{label:'累積数量',data:cumData,borderColor:'#3a6b45',backgroundColor:'rgba(58,107,69,0.12)',fill:true,tension:0.25,pointRadius:2,borderWidth:2.5}]},
+      options:Object.assign({},baseOpts,{
+        plugins:Object.assign({},baseOpts.plugins,{
+          zoom:{pan:{enabled:true,mode:'x'},zoom:{pinch:{enabled:true},wheel:{enabled:true},mode:'x'}},
+          tooltip:Object.assign({},baseOpts.plugins.tooltip,{callbacks:{label:function(ctx){return ' 累積 '+fmt(ctx.parsed.y)+'kg';}}})
+        })
+      })}));
+  }
 }
 
 /* ===== 荷口単価対応：金額計算ヘルパー ===== */
