@@ -690,7 +690,6 @@ body{
   <!-- サブタブ -->
   <div style="display:flex;gap:6px;margin-bottom:12px;background:var(--paper2);padding:4px;border-radius:10px;">
     <button id="cal-tab-cal"      onclick="showCalTab('cal')"      style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--matcha);color:#fff;">📅 カレンダー</button>
-    <button id="cal-tab-activity" onclick="showCalTab('activity')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">✅ 稼働</button>
     <button id="cal-tab-gantt"    onclick="showCalTab('gantt')"    style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📊 稼働表</button>
   </div>
   <!-- カレンダービュー -->
@@ -749,10 +748,6 @@ body{
         <button class="btn-primary" onclick="addRestDay()" style="margin-top:0;">＋ 休みを記録する</button>
       </div>
     </div>
-  </div>
-  <!-- 稼働チェックリストビュー -->
-  <div id="cal-view-activity" style="display:none;">
-    <div id="activity-content"></div>
   </div>
   <!-- 稼働ガントビュー -->
   <div id="cal-view-gantt" style="display:none;">
@@ -1171,6 +1166,22 @@ var TRADES_DATA=[];
 var VARIETIES_DATA=["やぶきた", "おくみどり", "ふじかおり", "さえみどり", "あさつゆ", "かなやみどり", "ごこう", "むさしかおり", "するがわせ", "きらり31", "せいめい", "つゆひかり", "はつもみじ", "べにひかり", "やまかい"];
 var SEASONS_DATA=[{"id": 1, "name": "一番茶", "start": "2024-04-01", "end": "2024-06-30"}, {"id": 2, "name": "一番茶", "start": "2026-04-01", "end": "2026-06-30"}];
 var _MEM={};
+function _normalizeSeasonDefs(){
+  seasonDefs=(seasonDefs||[]).map(function(s){
+    return {name:s.name, startDate:s.startDate||s.start||'', endDate:s.endDate||s.end||''};
+  }).filter(function(s){return s.name&&s.startDate&&s.endDate;});
+}
+function seasonForDate(dateStr){
+  if(!dateStr) return '';
+  var best=null;
+  (seasonDefs||[]).forEach(function(s){
+    var st=s.startDate||s.start, en=s.endDate||s.end;
+    if(st&&en&&dateStr>=st&&dateStr<=en){
+      if(!best || st>(best.startDate||best.start)) best=s; // 重複時は開始日が遅い方を採用
+    }
+  });
+  return best?best.name:'';
+}
 var _STORAGE_PERSISTENT=false;
 var _safeLS=(function(){
   try{
@@ -1254,7 +1265,7 @@ function _applyData(data){
   if(data.ocha_components){ try{components=JSON.parse(typeof data.ocha_components==='string'?data.ocha_components:JSON.stringify(data.ocha_components));}catch(e){components=data.ocha_components||[];} }
   if(data.ocha_teai_images){ try{teaiImages=JSON.parse(typeof data.ocha_teai_images==='string'?data.ocha_teai_images:JSON.stringify(data.ocha_teai_images));}catch(e){teaiImages=data.ocha_teai_images||{};} }
   if(data.ocha_varieties){ try{varieties=JSON.parse(typeof data.ocha_varieties==='string'?data.ocha_varieties:JSON.stringify(data.ocha_varieties));}catch(e){varieties=data.ocha_varieties||[];} }
-  if(data.ocha_season_defs){ try{seasonDefs=JSON.parse(typeof data.ocha_season_defs==='string'?data.ocha_season_defs:JSON.stringify(data.ocha_season_defs));}catch(e){seasonDefs=data.ocha_season_defs||[];} }
+  if(data.ocha_season_defs){ try{seasonDefs=JSON.parse(typeof data.ocha_season_defs==='string'?data.ocha_season_defs:JSON.stringify(data.ocha_season_defs));}catch(e){seasonDefs=data.ocha_season_defs||[];} _normalizeSeasonDefs(); }
   if(data.ocha_rest_days){ try{restDays=JSON.parse(typeof data.ocha_rest_days==='string'?data.ocha_rest_days:JSON.stringify(data.ocha_rest_days));}catch(e){restDays=data.ocha_rest_days||{};} }
   if(data.ocha_orders){ try{orders=JSON.parse(typeof data.ocha_orders==='string'?data.ocha_orders:JSON.stringify(data.ocha_orders));}catch(e){orders=data.ocha_orders||[];} }
   if(data.ocha_analyze_order){ try{analyzeOrder=JSON.parse(typeof data.ocha_analyze_order==='string'?data.ocha_analyze_order:JSON.stringify(data.ocha_analyze_order));}catch(e){} }
@@ -1315,6 +1326,21 @@ function load(){
   try{var sv=_safeLS.getItem('ocha_varieties');varieties=sv?JSON.parse(sv):EMBEDDED_VARIETIES;}catch(e){varieties=EMBEDDED_VARIETIES;}
 
   try{var sd=JSON.parse(_safeLS.getItem('ocha_season_defs')||'null');seasonDefs=sd&&sd.length?sd:EMBEDDED_SEASONS;}catch(e){seasonDefs=EMBEDDED_SEASONS;}
+  _normalizeSeasonDefs();
+  // 二番茶の定義を一度だけ追加（無ければ）
+  try{
+    if(!_safeLS.getItem('ocha_add_nibancha_v1')){
+      if(!seasonDefs.some(function(s){return s.name==='二番茶';})){
+        seasonDefs.push({name:'二番茶',startDate:'2026-06-01',endDate:'2026-07-31'});
+        seasonDefs.sort(function(a,b){return String(a.startDate).localeCompare(String(b.startDate));});
+      }
+      _safeLS.setItem('ocha_add_nibancha_v1','1');
+    }
+  }catch(e){}
+  // 茶期が空の取引へ日付から自動割り当て（毎回・空のものだけ）
+  try{
+    trades.forEach(function(t){ if(!t.season && t.date){ var sn=seasonForDate(t.date); if(sn) t.season=sn; } });
+  }catch(e){}
 
   try{restDays=JSON.parse(_safeLS.getItem('ocha_rest_days')||'{}');}catch(e){restDays={};}
   try{orders=JSON.parse(_safeLS.getItem('ocha_orders')||'[]');}catch(e){orders=[];}
@@ -1946,6 +1972,8 @@ function renderMemoList(){
 }
 function deleteMemo(id){
   id = Number(id);
+  var _rm=[]; Object.keys(quickMemos).forEach(function(k){ (quickMemos[k]||[]).forEach(function(m){ if(m.id===id) _rm.push(m); }); });
+  if(_rm.length) setLastDeleted({type:'memo', items:_rm, label:'メモを削除しました'});
   Object.keys(quickMemos).forEach(function(k){
     quickMemos[k] = (quickMemos[k]||[]).filter(function(m){ return m.id!==id; });
   });
@@ -1955,14 +1983,14 @@ function deleteMemo(id){
 /* ---- カレンダー サブタブ ---- */
 var calTab = 'cal';
 function showCalTab(tab){
+  if(tab==='activity') tab='gantt';
   calTab = tab;
-  ['cal','activity','gantt'].forEach(function(t){
+  ['cal','gantt'].forEach(function(t){
     var v=document.getElementById('cal-view-'+t);
     var b=document.getElementById('cal-tab-'+t);
     if(v) v.style.display=t===tab?'':'none';
     if(b){ b.style.background=t===tab?'var(--matcha)':'transparent'; b.style.color=t===tab?'#fff':'var(--muted)'; }
   });
-  if(tab==='activity') renderActivityCheck();
   if(tab==='gantt')    renderGantt();
 }
 
@@ -2052,6 +2080,7 @@ function cycleActivity(date, pid){
   else activityLog[date][pid]=next;
   saveActivityLog();
   renderActivityCheck();
+  if(document.getElementById('gantt-month-area')) renderGanttMonth();
   renderCalendar();
 }
 
@@ -2082,7 +2111,7 @@ function renderGantt(){
     +'</select>'
     +'<button onclick="ganttNextMonth()" style="padding:8px 14px;font-size:16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);cursor:pointer;">›</button>'
     +'</div>';
-  html+='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;">● 稼働あり　× 休み　日付/天気タップで詳細</div>';
+  html+='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;">マスをタップ：空白→●稼働→×休み→空白　｜　日付/天気タップで詳細</div>';
   html+='<div id="gantt-month-area"></div>';
   html+='<div id="gantt-weather-detail" style="display:none;margin-top:8px;"></div>';
   el.innerHTML=html;
@@ -2585,7 +2614,7 @@ function addLot(){
   if(!container) return;
   var div=document.createElement('div');
   div.className='lot-box'; div.id='lot-'+id;
-  div.innerHTML='<div class="lot-box-header"><span class="lot-box-title">📦 荷口 '+id+'</span>'+(id>1?'<button class="lot-del-btn" onclick="removeLot('+id+')">✕ 削除</button>':'')+'</div><div class="lot-mark-row"><label>荷印（ロット番号）</label><input type="text" id="lot-mark-'+id+'" placeholder="例：A-001、山田1番"></div><div class="lot-qty-row"><label>数量 (kg)</label><input type="number" id="lot-qty-'+id+'" placeholder="0.0" inputmode="decimal" step="0.1" oninput="updateGrandTotal()"></div>';
+  div.innerHTML='<div class="lot-box-header"><span class="lot-box-title">📦 荷口 '+id+'</span>'+(id>1?'<button class="lot-del-btn" onclick="removeLot('+id+')">✕ 削除</button>':'')+'</div><div class="lot-mark-row"><label>荷印（ロット番号）</label><input type="text" id="lot-mark-'+id+'" placeholder="例：A-001、山田1番"></div><div class="lot-qty-row"><label>数量 (kg)</label><input type="number" id="lot-qty-'+id+'" placeholder="0.0" inputmode="decimal" step="0.1" oninput="updateGrandTotal()"></div><div class="lot-qty-row"><label>単価 (円/kg)　※空欄＝上の売値を使用</label><input type="number" id="lot-price-'+id+'" placeholder="空欄なら共通売値" inputmode="numeric" oninput="updateGrandTotal()"></div>';
   container.appendChild(div);
   updateGrandTotal();
 }
@@ -2602,7 +2631,10 @@ function collectLots(){
     var id=box.id.replace('lot-','');
     var mark=(document.getElementById('lot-mark-'+id)||{value:''}).value.trim();
     var qty=parseFloat((document.getElementById('lot-qty-'+id)||{value:'0'}).value)||0;
-    if(qty>0||mark) lots.push({mark:mark,qty:qty});
+    var lp=parseFloat((document.getElementById('lot-price-'+id)||{value:''}).value);
+    var lot={mark:mark,qty:qty};
+    if(!isNaN(lp)&&lp>0) lot.price=lp;
+    if(qty>0||mark) lots.push(lot);
   });
   return lots;
 }
@@ -2618,6 +2650,9 @@ function savePartner(){
 }
 function deletePartner(id){
   if(!confirm('この取引先を削除しますか？')) return;
+  var _p=partners.find(function(p){return p.id===id;});
+  var _rt=trades.filter(function(t){return t.producerId===id||t.buyerId===id;});
+  setLastDeleted({type:'partner', partners:_p?[_p]:[], trades:_rt, label:'取引先を削除しました'});
   partners=partners.filter(function(p){return p.id!==id;});
   trades=trades.filter(function(t){return t.producerId!==id&&t.buyerId!==id;});
   save(); renderAll(); goBack('partners'); toast('取引先を削除しました');
@@ -2667,7 +2702,7 @@ function showPartnerDetail(id){
     html+=myTrades.map(function(t){
       var prod=partners.find(function(x){return x.id===t.producerId;});
       var buy=partners.find(function(x){return x.id===t.buyerId;});
-      return '<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span class="trade-date">'+t.date+'</span><span class="trade-amount">'+((t.totalQty||0)*t.price).toLocaleString()+'円</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(t.totalQty||0)+'kg'].filter(Boolean).join(' / ')+'</div></div>';
+      return '<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span class="trade-date">'+t.date+'</span><span class="trade-amount">'+tradeAmount(t).toLocaleString()+'円</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(t.totalQty||0)+'kg'].filter(Boolean).join(' / ')+'</div></div>';
     }).join('');
   }
   html+='<button onclick="mergePartnerStart('+p.id+')" style="width:100%;margin-top:16px;padding:13px;font-size:14px;font-weight:700;border-radius:var(--radius-sm);background:var(--surface);color:var(--matcha);border:1.5px solid var(--matcha-mid);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🔗 別の取引先と統合する</button>';
@@ -2733,7 +2768,7 @@ function saveTrade(){
     if(el&&el.value!=='') comps[c]=parseFloat(el.value);
   });
   var kobikiPct=getKobikiPct();
-  trades.push({id:Date.now(),date:document.getElementById('t-date').value,season:'',producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,memo:document.getElementById('t-memo').value.trim()});
+  trades.push({id:Date.now(),date:document.getElementById('t-date').value,season:seasonForDate(document.getElementById('t-date').value),producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,memo:document.getElementById('t-memo').value.trim()});
   save();
   document.getElementById('t-price').value='';
   document.getElementById('t-variety').value='';
@@ -2757,6 +2792,7 @@ function saveTrade(){
 }
 function deleteTrade(id){
   if(!confirm('この取引記録を削除しますか？')) return;
+  var _t=trades.find(function(t){return t.id===id;}); if(_t) setLastDeleted({type:'trade', items:[_t], label:'取引記録を削除しました'});
   trades=trades.filter(function(t){return t.id!==id;}); save(); renderAll(); goBack('trades'); toast('取引記録を削除しました');
 }
 function clearDateFilter(){
@@ -2784,14 +2820,14 @@ function renderTradeList(){
     var prod=partners.find(function(p){return p.id===t.producerId;});
     var buy=partners.find(function(p){return p.id===t.buyerId;});
     var marks=(t.lots||[]).filter(function(l){return l.mark;}).map(function(l){return l.mark;}).join('・');
-    return '<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span class="trade-date">📅 '+t.date+'</span><span class="trade-amount">'+((t.totalQty||0)*t.price).toLocaleString()+'円</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(t.totalQty||0)+'kg',t.price.toLocaleString()+'円/kg'].filter(Boolean).join(' / ')+'</div>'+(marks?'<div style="font-size:11px;color:var(--hint);margin-top:4px;">🏷 '+marks+'</div>':'')+'</div>';
+    return '<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span class="trade-date">📅 '+t.date+'</span><span class="trade-amount">'+tradeAmount(t).toLocaleString()+'円</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(t.totalQty||0)+'kg',t.price.toLocaleString()+'円/kg'].filter(Boolean).join(' / ')+'</div>'+(marks?'<div style="font-size:11px;color:var(--hint);margin-top:4px;">🏷 '+marks+'</div>':'')+'</div>';
   }).join('');
 }
 function showTradeDetail(id){
   var t=trades.find(function(x){return x.id===id;}); if(!t) return;
   var prod=partners.find(function(p){return p.id===t.producerId;});
   var buy=partners.find(function(p){return p.id===t.buyerId;});
-  var totalAmt=(t.totalQty||0)*t.price;
+  var totalAmt=tradeAmount(t);
   var kobikiPct=t.kobiki||0;
   var netPrice=kobikiPct>0?Math.round(t.price*(1-kobikiPct/100)):t.price;
   var kobikiRow=kobikiPct>0
@@ -2799,7 +2835,7 @@ function showTradeDetail(id){
      +'<div class="drow"><span class="dkey" style="color:var(--gold);">粉引き後単価</span><span class="dval" style="color:var(--gold);font-weight:700;">'+netPrice.toLocaleString()+' 円/kg</span></div>'
     :'';
   var lotRows=(t.lots||[]).map(function(l,i){
-    return '<div class="lot-detail-box"><div class="lot-detail-title">📦 荷口 '+(i+1)+(l.mark?' ｜ 🏷 '+l.mark:'')+'</div><div class="lot-drow"><span style="color:var(--accent);font-weight:700;">数量</span><span style="color:var(--accent);font-weight:700;">'+fmt(l.qty)+' kg</span></div></div>';
+    return '<div class="lot-detail-box"><div class="lot-detail-title">📦 荷口 '+(i+1)+(l.mark?' ｜ 🏷 '+l.mark:'')+'</div><div class="lot-drow"><span style="color:var(--accent);font-weight:700;">数量</span><span style="color:var(--accent);font-weight:700;">'+fmt(l.qty)+' kg</span></div><div class="lot-drow"><span>単価</span><span>'+lotPrice(t,l).toLocaleString()+' 円/kg'+(l.price!=null&&l.price>0?'':'（共通）')+'</span></div><div class="lot-drow"><span>金額</span><span>'+Math.round(l.qty*lotPrice(t,l)).toLocaleString()+' 円</span></div></div>';
   }).join('');
   var compRows=Object.entries(t.components||{}).filter(function(e){return e[1]!==undefined&&!isNaN(e[1]);}).map(function(e){return '<div class="drow"><span class="dkey">'+e[0]+'</span><span class="dval">'+e[1]+'</span></div>';}).join('');
   var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
@@ -2843,6 +2879,8 @@ function editTrade(id){
       +'<input type="text" id="edit-lot-mark-'+i+'" value="'+escAttr(l.mark||'')+'" placeholder="例：A-001"></div>'
       +'<div class="lot-qty-row"><label>数量 (kg)</label>'
       +'<input type="number" id="edit-lot-qty-'+i+'" value="'+l.qty+'" inputmode="decimal" step="0.1" oninput="updateEditTotal()"></div>'
+      +'<div class="lot-qty-row"><label>単価 (円/kg)　※空欄＝共通売値</label>'
+      +'<input type="number" id="edit-lot-price-'+i+'" value="'+(l.price!=null?l.price:'')+'" placeholder="空欄なら共通売値" inputmode="numeric"></div>'
       +'</div>';
   }).join('');
 
@@ -2974,6 +3012,8 @@ function addEditLot(){
     +'<input type="text" id="edit-lot-mark-'+idx+'" placeholder="例：A-001"></div>'
     +'<div class="lot-qty-row"><label>数量 (kg)</label>'
     +'<input type="number" id="edit-lot-qty-'+idx+'" value="" placeholder="0.0" inputmode="decimal" step="0.1" oninput="updateEditTotal()"></div>'
+    +'<div class="lot-qty-row"><label>単価 (円/kg)　※空欄＝共通売値</label>'
+    +'<input type="number" id="edit-lot-price-'+idx+'" value="" placeholder="空欄なら共通売値" inputmode="numeric"></div>'
     +'</div>';
   list.appendChild(div);
   updateEditTotal();
@@ -3000,7 +3040,10 @@ function updateTrade(id){
     var idx=box.id.replace('edit-lot-','');
     var mark=(document.getElementById('edit-lot-mark-'+idx)||{value:''}).value.trim();
     var qty=parseFloat((document.getElementById('edit-lot-qty-'+idx)||{value:'0'}).value)||0;
-    if(qty>0||mark) lots.push({mark:mark,qty:qty});
+    var lp=parseFloat((document.getElementById('edit-lot-price-'+idx)||{value:''}).value);
+    var lot={mark:mark,qty:qty};
+    if(!isNaN(lp)&&lp>0) lot.price=lp;
+    if(qty>0||mark) lots.push(lot);
   });
   if(!lots.length){alert('荷口を1件以上入力してください');return;}
   var totalQty=lots.reduce(function(s,l){return s+l.qty;},0);
@@ -3082,7 +3125,7 @@ function renderCalendar(){
       var prod=partners.find(function(p){return p.id===t.producerId;});
       var buy=partners.find(function(p){return p.id===t.buyerId;});
       (t.lots||[]).forEach(function(l){
-        rows+='<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span style="font-size:12px;font-weight:700;color:var(--amber);">🏷 '+(l.mark||'荷印なし')+'</span><span class="trade-amount">'+t.price.toLocaleString()+' 円/kg</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(l.qty)+'kg','計'+(l.qty*t.price).toLocaleString()+'円'].filter(Boolean).join(' / ')+'</div></div>';
+        rows+='<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span style="font-size:12px;font-weight:700;color:var(--amber);">🏷 '+(l.mark||'荷印なし')+'</span><span class="trade-amount">'+lotPrice(t,l).toLocaleString()+' 円/kg</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div><div class="trade-sub">'+[t.variety,fmt(l.qty)+'kg','計'+(l.qty*lotPrice(t,l)).toLocaleString()+'円'].filter(Boolean).join(' / ')+'</div></div>';
       });
     });
     var inner='';
@@ -3377,6 +3420,8 @@ function addRestDay(){
 function deleteRestDay(pid,season,date){
   if(!confirm('この休みの記録を削除しますか？')) return;
   var key=restKey(pid,season);
+  var _r=(restDays[key]||[]).filter(function(r){return r.date===date;});
+  if(_r.length) setLastDeleted({type:'restday', key:key, items:_r, label:'休みの記録を削除しました'});
   restDays[key]=(restDays[key]||[]).filter(function(r){return r.date!==date;});
   if(!restDays[key].length) delete restDays[key];
   saveRestDays(); renderCalRestList(); renderCalendar(); toast('削除しました');
@@ -3534,6 +3579,7 @@ function showAnalyzeTab(tab){
 
 function getAnalyzeYears(){
   var years = {};
+  years[new Date().getFullYear()] = 1; // 今年は常に選択肢に出す
   trades.forEach(function(t){ if(t.date) years[t.date.slice(0,4)] = 1; });
   return Object.keys(years).sort().reverse();
 }
@@ -3556,11 +3602,18 @@ function onAnalyzeSeasonChange(val){
 
 function renderAnalyze(){
   var el=document.getElementById('analyze-content'); if(!el) return;
+  if(!window._analyzeInit){
+    window._analyzeInit=true;
+    var _today=new Date().toISOString().split('T')[0];
+    analyzeYear=_today.slice(0,4);
+    var _sn=seasonForDate(_today);
+    if(_sn) analyzeSeason=_sn;
+  }
   if(!analyzeOrder) loadAnalyzeOrder();
   var ftrades = getFilteredTrades();
   var total=ftrades.length;
   var totalQty=ftrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
-  var totalAmt=ftrades.reduce(function(s,t){return s+(t.totalQty||0)*t.price;},0);
+  var totalAmt=ftrades.reduce(function(s,t){return s+tradeAmount(t);},0);
   var thisMonth=new Date().toISOString().slice(0,7);
   var mTrades=ftrades.filter(function(t){return t.date&&t.date.indexOf(thisMonth)===0;});
   var mQty=mTrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
@@ -3625,8 +3678,8 @@ function renderAnalyze(){
       // 内訳（1.6%と1.8%を分けて表示）
       var fee16 = ftrades.filter(function(t){return getFeeRate(t.producerId,t.buyerId)===FEE_RATE_LOW;});
       var fee18 = ftrades.filter(function(t){return getFeeRate(t.producerId,t.buyerId)===FEE_RATE_HIGH;});
-      var amt16 = fee16.reduce(function(s,t){return s+(t.totalQty||0)*t.price;},0);
-      var amt18 = fee18.reduce(function(s,t){return s+(t.totalQty||0)*t.price;},0);
+      var amt16 = fee16.reduce(function(s,t){return s+tradeAmount(t);},0);
+      var amt18 = fee18.reduce(function(s,t){return s+tradeAmount(t);},0);
       h+='<div class="stat-card" style="margin-bottom:16px;background:var(--gold-light);border-color:var(--gold-mid);cursor:pointer;user-select:none;" onclick="toggleKomisyon(this)">'
         +'<div class="stat-label" style="color:var(--gold);">斡旋口銭（合計）<span style="font-size:10px;color:var(--hint);margin-left:6px;">タップで表示</span></div>'
         +'<div class="komisyon-val" style="font-size:26px;color:var(--gold);filter:blur(6px);transition:filter .3s;">'+(totalFee>0?totalFee.toLocaleString()+'円':'—')+'</div>'
@@ -3780,7 +3833,7 @@ function renderAnalyze(){
           var pTrades=ftrades.filter(function(t){return t.producerId===p.id;});
           if(!pTrades.length) return;
           var pQty=pTrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
-          var pAmt=pTrades.reduce(function(s,t){return s+(t.totalQty||0)*t.price;},0);
+          var pAmt=pTrades.reduce(function(s,t){return s+tradeAmount(t);},0);
           var avgPrice=pQty>0?Math.round(pAmt/pQty):0;
           h+='<div style="display:grid;grid-template-columns:1fr auto auto;padding:12px 16px;border-bottom:1px solid var(--paper2);align-items:center;">';
           h+='<div style="font-size:13px;font-weight:600;">'+p.name+'</div>';
@@ -3842,6 +3895,7 @@ function renderAnalyze(){
   var seasonNames=[];
   ftrades.forEach(function(t){if(t.season&&!seenS[t.season]){seenS[t.season]=1;seasonNames.push(t.season);}});
   trades.forEach(function(t){if(t.season&&!seenS[t.season]){seenS[t.season]=1;seasonNames.push(t.season);}});
+  getSeasonDefs().forEach(function(s){if(s.name&&!seenS[s.name]){seenS[s.name]=1;seasonNames.push(s.name);}});
   var seasonOpts = '<option value="all"'+(analyzeSeason==='all'?' selected':'')+'>全茶期</option>'
     + seasonNames.map(function(s){return '<option value="'+s+'"'+(analyzeSeason===s?' selected':'')+'>'+s+'</option>';}).join('');
   var filterHTML =
@@ -4377,7 +4431,7 @@ function renderProducerCharts(){
         var ts=(varietyByDate[d]&&varietyByDate[d][vari])||[];
         if(!ts.length) return null;
         var tQ=ts.reduce(function(s,t){return s+(t.totalQty||0);},0);
-        var tA=ts.reduce(function(s,t){return s+(t.totalQty||0)*t.price;},0);
+        var tA=ts.reduce(function(s,t){return s+tradeAmount(t);},0);
         return tQ>0?Math.round(tA/tQ):ts[0].price;
       });
       var qtyPoints=allDates.map(function(d){
@@ -4476,8 +4530,9 @@ function _buildChartJs(series, labels){
       pointBorderWidth: 2,
       pointRadius: 4,
       pointHoverRadius: 6,
-      tension: 0.3,
+      tension: 0.35,
       fill: true,
+      borderWidth: 2.5,
       spanGaps: true,
     };
   });
@@ -4509,8 +4564,9 @@ function _buildChartJs(series, labels){
       label: s.label,
       data: s.qtys,
       backgroundColor: s.color.bar,
-      borderRadius: 3,
+      borderRadius: 6,
       borderSkipped: false,
+      maxBarThickness: 26,
     };
   });
   var qcEl = document.getElementById('producer-qty-chart');
@@ -5216,6 +5272,66 @@ function openImageView(src){
   ov.onclick=function(){ if(ov.parentNode) document.body.removeChild(ov); };
   var img=document.createElement('img'); img.src=src; img.style.cssText='max-width:100%;max-height:100%;border-radius:8px;';
   ov.appendChild(img); document.body.appendChild(ov);
+}
+
+/* ===== 元に戻す（直前の削除を復元） ===== */
+var _lastDeleted=null;
+function setLastDeleted(obj){
+  _lastDeleted=obj;
+  try{ _safeLS.setItem('ocha_last_deleted', JSON.stringify(obj)); }catch(e){}
+  showUndoBar(obj.label||'削除しました');
+}
+function showUndoBar(msg){
+  var bar=document.getElementById('undo-bar');
+  if(!bar){
+    bar=document.createElement('div'); bar.id='undo-bar';
+    bar.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:99998;background:#2c2c2c;color:#fff;border-radius:24px;padding:9px 10px 9px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.35);font-family:\'Noto Sans JP\',sans-serif;font-size:13px;max-width:92%;';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML='<span id="undo-bar-msg" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>'
+    +'<button onclick="undoDelete()" style="background:#ff9800;color:#fff;border:none;border-radius:16px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;white-space:nowrap;">↩️ 元に戻す</button>'
+    +'<button onclick="document.getElementById(\'undo-bar\').style.display=\'none\'" style="background:transparent;color:#bbb;border:none;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>';
+  bar.querySelector('#undo-bar-msg').textContent=msg;
+  bar.style.display='flex';
+  clearTimeout(window._undoTimer);
+  window._undoTimer=setTimeout(function(){ var b=document.getElementById('undo-bar'); if(b) b.style.display='none'; },15000);
+}
+function undoDelete(){
+  try{ var v=_safeLS.getItem('ocha_last_deleted'); if(v) _lastDeleted=JSON.parse(v); }catch(e){}
+  if(!_lastDeleted){ toast('元に戻せる操作がありません'); return; }
+  var d=_lastDeleted;
+  try{
+    if(d.type==='memo'){
+      (d.items||[]).forEach(function(m){ var k=m.date||'_nodate'; if(!quickMemos[k]) quickMemos[k]=[]; quickMemos[k].unshift(m); });
+      saveMemos(); loadMemos();
+    } else if(d.type==='trade'){
+      (d.items||[]).forEach(function(t){ trades.push(t); });
+      save();
+    } else if(d.type==='partner'){
+      (d.partners||[]).forEach(function(p){ if(!partners.some(function(x){return x.id===p.id;})) partners.push(p); });
+      (d.trades||[]).forEach(function(t){ if(!trades.some(function(x){return x.id===t.id;})) trades.push(t); });
+      save();
+    } else if(d.type==='restday'){
+      var k=d.key; if(!restDays[k]) restDays[k]=[];
+      (d.items||[]).forEach(function(r){ if(!restDays[k].some(function(x){return x.date===r.date;})) restDays[k].push(r); });
+      restDays[k].sort(function(a,b){return a.date.localeCompare(b.date);});
+      if(typeof saveRestDays==='function') saveRestDays();
+      save();
+    }
+  }catch(e){}
+  _lastDeleted=null; try{ _safeLS.removeItem('ocha_last_deleted'); }catch(e){}
+  var bar=document.getElementById('undo-bar'); if(bar) bar.style.display='none';
+  loadMemos(); renderAll(); renderCalendar();
+  toast('元に戻しました');
+}
+
+/* ===== 荷口単価対応：金額計算ヘルパー ===== */
+function lotPrice(t,l){ return (l&&l.price!=null&&l.price>0)?l.price:(t.price||0); }
+function tradeAmount(t){
+  if(t.lots&&t.lots.length){
+    var s=0; t.lots.forEach(function(l){ s+=(l.qty||0)*lotPrice(t,l); }); return s;
+  }
+  return (t.totalQty||0)*(t.price||0);
 }
 
 load();
