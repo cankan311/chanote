@@ -518,9 +518,7 @@ body{
 </style>
 
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
 </head>
 <body>
 <div class="app" id="app">
@@ -3855,7 +3853,7 @@ function renderAnalyze(){
           return '<div class="card" style="margin-bottom:14px;">'
             +'<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;">'+title+'</div>'
             +(extra||'')
-            +'<div style="position:relative;height:'+h2+'px;"><canvas id="'+canvasId+'"></canvas></div></div>';
+            +'<div style="position:relative;height:'+h2+'px;"><div id="'+canvasId+'" data-ec style="width:100%;height:100%;"></div></div></div>';
         }
         h+='<div class="section-label">全体グラフ</div>';
         h+=ovBlock('📈 日別 出荷量と平均単価','ov-daily',230,'<div style="font-size:10px;color:var(--hint);margin-bottom:6px;">棒＝数量(kg)　線＝平均単価(円/kg)　※ピンチでズーム</div>');
@@ -3868,20 +3866,19 @@ function renderAnalyze(){
       if(producers.length&&ftrades.length){
         h+='<div class="section-label">生産家別 価格・数量グラフ</div>';
         h+='<div class="card" style="margin-bottom:14px;">'+producerSelectHtml;
-        h+='<div id="producer-chart-legend" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding:10px 12px;background:var(--paper2);border-radius:8px;min-height:28px;"></div>';
         h+='<div style="margin-top:14px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
         h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">価格推移（円/kg）― 売り先・品種別</span>';
         h+='<button onclick="resetPriceZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
-        h+='<div style="position:relative;height:240px;"><canvas id="producer-price-chart"></canvas></div></div>';
+        h+='<div style="position:relative;height:300px;"><div id="producer-price-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
         h+='<div style="margin-top:16px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
         h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">数量推移（kg）― 売り先・品種別</span>';
         h+='<button onclick="resetQtyZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
-        h+='<div style="position:relative;height:220px;"><canvas id="producer-qty-chart"></canvas></div></div>';
-        h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">ピンチでズーム・スワイプでスクロール</div>';
+        h+='<div style="position:relative;height:280px;"><div id="producer-qty-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
+        h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">二本指ピンチでズーム／下のバーで範囲移動／凡例タップで表示切替</div>';
         h+='</div>';
       }
     } else if(id==='buyer'){
@@ -4404,223 +4401,11 @@ var _qtyChartInstance   = null;
 
 function renderProducerCharts(){
   var sel=document.getElementById('analyze-producer-select');
-  if(!sel) return;
-  var pid=parseInt(sel.value);
-  var pTrades=getFilteredTrades().filter(function(t){return t.producerId===pid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-
-  var legEl=document.getElementById('producer-chart-legend');
-
-  if(!pTrades.length){
-    if(legEl) legEl.innerHTML='';
-    if(_priceChartInstance){_priceChartInstance.destroy();_priceChartInstance=null;}
-    if(_qtyChartInstance){_qtyChartInstance.destroy();_qtyChartInstance=null;}
-    return;
-  }
-
-  // 売り先ごとにグループ化
-  var buyerMap={};
-  pTrades.forEach(function(t){
-    var bKey=t.buyerId?String(t.buyerId):'none';
-    if(!buyerMap[bKey]) buyerMap[bKey]=[];
-    buyerMap[bKey].push(t);
-  });
-
-  // 全日付リスト
-  var dateSet={}, allDates=[];
-  pTrades.forEach(function(t){if(t.date&&!dateSet[t.date]){dateSet[t.date]=1;allDates.push(t.date);}});
-  allDates.sort();
-  var labels=allDates.map(function(d){return d.slice(5);});
-
-  // 系列構築
-  var series=[];
-  var colorIdx=0;
-  var allBuyers=partners.filter(function(p){return p.type==='chasho';});
-
-  Object.keys(buyerMap).sort().forEach(function(bKey){
-    var bTrades=buyerMap[bKey];
-    var buyerName=bKey==='none'?'売先未設定':(function(){var b=allBuyers.find(function(p){return String(p.id)===bKey;});return b?b.name:'—';})();
-    var varietyByDate={};
-    bTrades.forEach(function(t){
-      var vari=t.variety||'品種不明';
-      if(!varietyByDate[t.date]) varietyByDate[t.date]={};
-      if(!varietyByDate[t.date][vari]) varietyByDate[t.date][vari]=[];
-      varietyByDate[t.date][vari].push(t);
-    });
-    var varietySet={};
-    bTrades.forEach(function(t){varietySet[t.variety||'品種不明']=1;});
-    Object.keys(varietySet).sort().forEach(function(vari){
-      var pricePoints=allDates.map(function(d){
-        var ts=(varietyByDate[d]&&varietyByDate[d][vari])||[];
-        if(!ts.length) return null;
-        var tQ=ts.reduce(function(s,t){return s+(t.totalQty||0);},0);
-        var tA=ts.reduce(function(s,t){return s+tradeAmount(t);},0);
-        return tQ>0?Math.round(tA/tQ):ts[0].price;
-      });
-      var qtyPoints=allDates.map(function(d){
-        var ts=(varietyByDate[d]&&varietyByDate[d][vari])||[];
-        return ts.reduce(function(s,t){return s+(t.totalQty||0);},0)||null;
-      });
-      var label=Object.keys(varietySet).length>1?buyerName+' ('+vari+')':buyerName;
-      var col=getChartColor(colorIdx++);
-      series.push({label:label,prices:pricePoints,qtys:qtyPoints,color:col,visible:true});
-    });
-  });
-
-  window._chartSeries=series;
-  window._chartLabels=labels;
-
-  // 凡例（チェックボックス）
-  if(legEl){
-    legEl.innerHTML='<div style="font-size:10px;color:var(--muted);width:100%;margin-bottom:4px;font-weight:600;">系列をタップでON/OFF</div>'
-      +series.map(function(s,i){
-        return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink2);cursor:pointer;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:20px;user-select:none;">'
-          +'<input type="checkbox" id="chart-toggle-'+i+'" checked onchange="toggleChartSeries('+i+')" style="accent-color:'+s.color.line+';width:14px;height:14px;cursor:pointer;">'
-          +'<span style="display:inline-block;width:18px;height:3px;background:'+s.color.line+';border-radius:2px;flex-shrink:0;"></span>'
-          +escText(s.label)+'</label>';
-      }).join('');
-  }
-
-  _buildChartJs(series, labels);
+  if(sel) renderProducerChartsEc();
 }
 
-function toggleChartSeries(idx){
-  if(!_priceChartInstance||!_qtyChartInstance) return;
-  var visible = _priceChartInstance.isDatasetVisible(idx);
-  _priceChartInstance.setDatasetVisibility(idx, !visible);
-  _qtyChartInstance.setDatasetVisibility(idx, !visible);
-  _priceChartInstance.update();
-  _qtyChartInstance.update();
-}
-
-function _buildChartJs(series, labels){
-  // 共通オプション
-  var commonOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode:'index', intersect:false },
-    plugins:{
-      legend:{ display:false },
-      tooltip:{
-        backgroundColor:'rgba(22,20,18,0.92)',
-        titleColor:'#b0a898',
-        bodyColor:'#fff',
-        borderColor:'rgba(255,255,255,0.1)',
-        borderWidth:1,
-        padding:10,
-        titleFont:{size:11},
-        bodyFont:{size:12,weight:'bold'},
-        callbacks:{
-          label: function(ctx){
-            var v = ctx.parsed.y;
-            if(v==null) return null;
-            return ctx.dataset.label+': '+(v>=10000?(v/10000).toFixed(1)+'万':v.toLocaleString());
-          }
-        }
-      },
-      zoom:{
-        pan:{ enabled:true, mode:'x' },
-        zoom:{
-          wheel:{ enabled:true },
-          pinch:{ enabled:true },
-          mode:'x',
-        }
-      }
-    },
-    scales:{
-      x:{
-        ticks:{ maxRotation:0, font:{size:10}, color:'#a8a098' },
-        grid:{ color:'rgba(0,0,0,0.04)' }
-      },
-      y:{
-        ticks:{ font:{size:10}, color:'#a8a098',
-          callback: function(v){ return v>=10000?(v/10000).toFixed(1)+'万':v.toLocaleString(); }
-        },
-        grid:{ color:'#ede8e0' }
-      }
-    }
-  };
-
-  // 価格折れ線グラフ
-  var priceDatasets = series.map(function(s){
-    return {
-      label: s.label,
-      data: s.prices,
-      borderColor: s.color.line,
-      backgroundColor: s.color.fill,
-      pointBackgroundColor: '#fff',
-      pointBorderColor: s.color.line,
-      pointBorderWidth: 2,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-      tension: 0.35,
-      fill: true,
-      borderWidth: 2.5,
-      spanGaps: true,
-    };
-  });
-  var pcEl = document.getElementById('producer-price-chart');
-  if(pcEl){
-    if(_priceChartInstance){ _priceChartInstance.destroy(); }
-    _priceChartInstance = new Chart(pcEl, {
-      type:'line',
-      data:{ labels:labels, datasets:priceDatasets },
-      options: Object.assign({}, commonOpts, {
-        plugins: Object.assign({}, commonOpts.plugins, {
-          tooltip: Object.assign({}, commonOpts.plugins.tooltip, {
-            callbacks:{
-              label:function(ctx){
-                var v=ctx.parsed.y;
-                if(v==null) return null;
-                return ctx.dataset.label+': '+(v>=10000?(v/10000).toFixed(1)+'万':v.toLocaleString())+'円/kg';
-              }
-            }
-          })
-        })
-      })
-    });
-  }
-
-  // 数量棒グラフ
-  var qtyDatasets = series.map(function(s){
-    return {
-      label: s.label,
-      data: s.qtys,
-      backgroundColor: s.color.bar,
-      borderRadius: 6,
-      borderSkipped: false,
-      maxBarThickness: 26,
-    };
-  });
-  var qcEl = document.getElementById('producer-qty-chart');
-  if(qcEl){
-    if(_qtyChartInstance){ _qtyChartInstance.destroy(); }
-    _qtyChartInstance = new Chart(qcEl, {
-      type:'bar',
-      data:{ labels:labels, datasets:qtyDatasets },
-      options: Object.assign({}, commonOpts, {
-        plugins: Object.assign({}, commonOpts.plugins, {
-          tooltip: Object.assign({}, commonOpts.plugins.tooltip, {
-            callbacks:{
-              label:function(ctx){
-                var v=ctx.parsed.y;
-                if(v==null) return null;
-                return ctx.dataset.label+': '+(v>=1000?(v/1000).toFixed(2)+'t':Math.round(v)+'kg');
-              }
-            }
-          })
-        })
-      })
-    });
-  }
-}
-
-function resetPriceZoom(){
-  if(_priceChartInstance) _priceChartInstance.resetZoom();
-}
-function resetQtyZoom(){
-  if(_qtyChartInstance) _qtyChartInstance.resetZoom();
-}
-
+function resetPriceZoom(){ ecResetZoom('producer-price-chart'); }
+function resetQtyZoom(){ ecResetZoom('producer-qty-chart'); }
 
 /* ---- グラフツールチップ共通 ---- */
 /* ====================================================
@@ -5347,111 +5132,284 @@ function undoDelete(){
   toast('元に戻しました');
 }
 
-/* ===== 全体グラフ（5種） ===== */
-var _ovCharts=[];
-function _ovDestroy(){ _ovCharts.forEach(function(c){ try{c.destroy();}catch(e){} }); _ovCharts=[]; }
-var OV_PALETTE=['#3a6b45','#c89b3c','#5b8db8','#b85c5c','#7a6bb8','#5cab9b','#c97f4f','#8aa84f','#b85c93','#6b7280'];
+/* ===== ECharts 共通基盤 ===== */
+function ecInit(id){
+  var el=document.getElementById(id);
+  if(!el||typeof echarts==='undefined') return null;
+  var old=echarts.getInstanceByDom(el); if(old) old.dispose();
+  return echarts.init(el,null,{renderer:'canvas'});
+}
+function ecResetZoom(id){
+  var el=document.getElementById(id); if(!el||typeof echarts==='undefined') return;
+  var c=echarts.getInstanceByDom(el); if(c) c.dispatchAction({type:'dataZoom',start:0,end:100});
+}
+window.addEventListener('resize',function(){
+  if(typeof echarts==='undefined') return;
+  document.querySelectorAll('[data-ec]').forEach(function(el){
+    var c=echarts.getInstanceByDom(el); if(c) c.resize();
+  });
+});
+var EC_FONT="'Noto Sans JP',sans-serif";
+var EC_PALETTE=['#3a6b45','#c89b3c','#5b8db8','#b85c5c','#7a6bb8','#5cab9b','#c97f4f','#8aa84f','#b85c93','#6b7280'];
+function ecMoney(v){ return v>=100000000?(v/100000000).toFixed(2)+'億円':v>=10000?Math.round(v/10000).toLocaleString()+'万円':Math.round(v).toLocaleString()+'円'; }
+function ecKg(v){ return v>=1000?(v/1000).toFixed(2)+'t':Math.round(v).toLocaleString()+'kg'; }
+function ecTooltip(){
+  return {trigger:'axis',confine:true,triggerOn:'mousemove|click',
+    backgroundColor:'rgba(28,26,23,0.94)',borderWidth:0,padding:[8,12],
+    textStyle:{color:'#fff',fontSize:12,fontFamily:EC_FONT},
+    axisPointer:{type:'line',lineStyle:{color:'rgba(58,107,69,0.45)',width:1.5}}};
+}
+function ecZoomXY(){
+  return [
+    {type:'inside',xAxisIndex:0,filterMode:'none'},
+    {type:'slider',xAxisIndex:0,filterMode:'none',height:16,bottom:6,borderColor:'transparent',
+     backgroundColor:'rgba(0,0,0,0.05)',fillerColor:'rgba(58,107,69,0.18)',
+     handleStyle:{color:'#3a6b45'},moveHandleStyle:{color:'#3a6b45'},
+     dataBackground:{lineStyle:{color:'rgba(58,107,69,0.3)'},areaStyle:{color:'rgba(58,107,69,0.08)'}},
+     textStyle:{fontSize:9,color:'#a8a098'}}
+  ];
+}
+function ecAxisX(labels){
+  return {type:'category',data:labels,boundaryGap:true,
+    axisLine:{lineStyle:{color:'rgba(0,0,0,0.12)'}},axisTick:{show:false},
+    axisLabel:{fontSize:10,color:'#a8a098',fontFamily:EC_FONT}};
+}
+function ecAxisY(fmtFn,color){
+  return {type:'value',
+    splitLine:{lineStyle:{color:'rgba(0,0,0,0.05)'}},axisLine:{show:false},axisTick:{show:false},
+    axisLabel:{fontSize:10,color:color||'#a8a098',formatter:function(v){return fmtFn?fmtFn(v):v.toLocaleString();}}};
+}
+
+/* ===== 全体グラフ（5種・ECharts） ===== */
 function renderOverviewCharts(){
-  if(typeof Chart==='undefined') return;
-  _ovDestroy();
+  if(typeof echarts==='undefined') return;
   var ftrades=getFilteredTrades();
   if(!ftrades.length) return;
-  var jpFont={family:"'Noto Sans JP',sans-serif"};
-  var baseOpts={responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{display:false},
-      tooltip:{backgroundColor:'rgba(22,20,18,0.92)',titleColor:'#b0a898',bodyColor:'#fff',padding:10,titleFont:{size:11},bodyFont:{size:12,weight:'bold'}}},
-    scales:{x:{ticks:{maxRotation:0,font:{size:10},color:'#a8a098'},grid:{display:false}},
-            y:{ticks:{font:{size:10},color:'#a8a098'},grid:{color:'rgba(0,0,0,0.05)'},beginAtZero:true}}};
 
-  // --- 1) 日別 数量＋平均単価 ---
+  // 日別集計
   var byDate={};
   ftrades.forEach(function(t){ if(!t.date)return; if(!byDate[t.date])byDate[t.date]={qty:0,amt:0}; byDate[t.date].qty+=(t.totalQty||0); byDate[t.date].amt+=tradeAmount(t); });
   var dts=Object.keys(byDate).sort();
-  var c1=document.getElementById('ov-daily');
+  var dLabels=dts.map(function(d){return d.slice(5).replace('-','/');});
+
+  // --- 1) 日別 出荷量×平均単価 ---
+  var c1=ecInit('ov-daily');
   if(c1&&dts.length){
-    _ovCharts.push(new Chart(c1,{type:'bar',
-      data:{labels:dts.map(function(d){return d.slice(5);}),
-        datasets:[
-          {type:'bar',label:'数量',data:dts.map(function(d){return Math.round(byDate[d].qty);}),backgroundColor:'rgba(58,107,69,0.55)',borderRadius:6,maxBarThickness:22,yAxisID:'y'},
-          {type:'line',label:'平均単価',data:dts.map(function(d){return byDate[d].qty>0?Math.round(byDate[d].amt/byDate[d].qty):null;}),borderColor:'#c89b3c',backgroundColor:'rgba(200,155,60,0.15)',pointBackgroundColor:'#fff',pointBorderColor:'#c89b3c',pointRadius:3,tension:0.35,yAxisID:'y2',spanGaps:true}
-        ]},
-      options:Object.assign({},baseOpts,{
-        interaction:{mode:'index',intersect:false},
-        plugins:Object.assign({},baseOpts.plugins,{
-          legend:{display:true,labels:{font:Object.assign({size:11},jpFont),boxWidth:14}},
-          zoom:{pan:{enabled:true,mode:'x'},zoom:{pinch:{enabled:true},wheel:{enabled:true},mode:'x'}},
-          tooltip:Object.assign({},baseOpts.plugins.tooltip,{callbacks:{label:function(ctx){var v=ctx.parsed.y;if(v==null)return null;return ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y2'?v.toLocaleString()+'円/kg':fmt(v)+'kg');}}})
-        }),
-        scales:{x:baseOpts.scales.x,
-          y:Object.assign({},baseOpts.scales.y,{position:'left',title:{display:true,text:'kg',font:{size:9}}}),
-          y2:{position:'right',beginAtZero:false,grid:{display:false},ticks:{font:{size:10},color:'#c89b3c',callback:function(v){return v.toLocaleString();}},title:{display:true,text:'円/kg',font:{size:9}}}}
-      })}));
+    c1.setOption({
+      animationDuration:400,
+      tooltip:Object.assign(ecTooltip(),{formatter:function(ps){
+        var h='<div style="font-weight:700;margin-bottom:4px;">'+ps[0].axisValue+'</div>';
+        ps.forEach(function(pp){ if(pp.value==null)return;
+          h+=pp.marker+' '+pp.seriesName+'：<b>'+(pp.seriesName==='平均単価'?Math.round(pp.value).toLocaleString()+'円/kg':ecKg(pp.value))+'</b><br>'; });
+        return h; }}),
+      legend:{top:0,textStyle:{fontSize:11,fontFamily:EC_FONT},itemWidth:14,itemHeight:9},
+      grid:{left:8,right:8,top:30,bottom:46,containLabel:true},
+      dataZoom:ecZoomXY(),
+      xAxis:ecAxisX(dLabels),
+      yAxis:[ecAxisY(ecKg,'#3a6b45'),Object.assign(ecAxisY(function(v){return v.toLocaleString();},'#c89b3c'),{splitLine:{show:false}})],
+      series:[
+        {name:'数量',type:'bar',data:dts.map(function(d){return Math.round(byDate[d].qty);}),
+         itemStyle:{color:'rgba(58,107,69,0.75)',borderRadius:[4,4,0,0]},barMaxWidth:22},
+        {name:'平均単価',type:'line',yAxisIndex:1,connectNulls:true,smooth:0.3,symbolSize:7,
+         data:dts.map(function(d){return byDate[d].qty>0?Math.round(byDate[d].amt/byDate[d].qty):null;}),
+         lineStyle:{width:2.5,color:'#c89b3c'},itemStyle:{color:'#c89b3c',borderColor:'#fff',borderWidth:2}}
+      ]
+    });
   }
 
-  // --- 2) 売り先別 金額シェア（ドーナツ） ---
+  // --- 2) 売り先別 金額シェア ---
   var byBuyer={};
   ftrades.forEach(function(t){ var b=partners.find(function(p){return p.id===t.buyerId;}); var nm=b?b.name:'売先未設定'; byBuyer[nm]=(byBuyer[nm]||0)+tradeAmount(t); });
   var bNames=Object.keys(byBuyer).sort(function(a,b){return byBuyer[b]-byBuyer[a];});
-  var c2=document.getElementById('ov-share');
+  var bTotal=bNames.reduce(function(s,n){return s+byBuyer[n];},0);
+  var c2=ecInit('ov-share');
   if(c2&&bNames.length){
-    _ovCharts.push(new Chart(c2,{type:'doughnut',
-      data:{labels:bNames,datasets:[{data:bNames.map(function(n){return Math.round(byBuyer[n]);}),backgroundColor:bNames.map(function(_,i){return OV_PALETTE[i%OV_PALETTE.length];}),borderColor:'#faf7f2',borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
-        plugins:{legend:{position:'right',labels:{font:Object.assign({size:11},jpFont),boxWidth:12,padding:8}},
-          tooltip:{callbacks:{label:function(ctx){var tot=ctx.dataset.data.reduce(function(a,b){return a+b;},0);var pct=tot?Math.round(ctx.parsed/tot*100):0;return ' '+ctx.label+': '+ctx.parsed.toLocaleString()+'円（'+pct+'%）';}}}}}}));
+    c2.setOption({
+      animationDuration:500,
+      tooltip:{trigger:'item',confine:true,backgroundColor:'rgba(28,26,23,0.94)',borderWidth:0,
+        textStyle:{color:'#fff',fontSize:12,fontFamily:EC_FONT},
+        formatter:function(pp){return pp.marker+' '+pp.name+'<br><b>'+ecMoney(pp.value)+'</b>（'+pp.percent+'%）';}},
+      legend:{type:'scroll',bottom:0,textStyle:{fontSize:10,fontFamily:EC_FONT},itemWidth:12,itemHeight:9,pageIconSize:10},
+      color:EC_PALETTE,
+      series:[{type:'pie',radius:['46%','72%'],center:['50%','42%'],
+        avoidLabelOverlap:true,itemStyle:{borderColor:'#faf7f2',borderWidth:2,borderRadius:5},
+        label:{show:true,formatter:'{d}%',fontSize:10,color:'#5a564e',fontFamily:EC_FONT},
+        labelLine:{length:8,length2:6},
+        data:bNames.map(function(n){return {name:n,value:Math.round(byBuyer[n])};})}],
+      graphic:[{type:'text',left:'center',top:'38%',style:{text:'合計',fontSize:10,fill:'#a8a098',fontFamily:EC_FONT}},
+               {type:'text',left:'center',top:'43%',style:{text:ecMoney(bTotal),fontSize:14,fontWeight:'bold',fill:'#3a6b45',fontFamily:EC_FONT}}]
+    });
   }
 
-  // --- 3) 生産家別 平均単価 TOP10（横棒） ---
+  // --- 3) 生産家別 平均単価 TOP10 ---
   var byProd={};
   ftrades.forEach(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); var nm=p?p.name:'—'; if(!byProd[nm])byProd[nm]={qty:0,amt:0}; byProd[nm].qty+=(t.totalQty||0); byProd[nm].amt+=tradeAmount(t); });
   var pNames=Object.keys(byProd).filter(function(n){return byProd[n].qty>0;})
-    .sort(function(a,b){return (byProd[b].amt/byProd[b].qty)-(byProd[a].amt/byProd[a].qty);}).slice(0,10);
-  var c3=document.getElementById('ov-prodprice');
+    .sort(function(a,b){return (byProd[b].amt/byProd[b].qty)-(byProd[a].amt/byProd[a].qty);}).slice(0,10).reverse();
+  var c3=ecInit('ov-prodprice');
   if(c3&&pNames.length){
-    _ovCharts.push(new Chart(c3,{type:'bar',
-      data:{labels:pNames,datasets:[{data:pNames.map(function(n){return Math.round(byProd[n].amt/byProd[n].qty);}),backgroundColor:pNames.map(function(_,i){return i===0?'#c89b3c':'rgba(58,107,69,0.65)';}),borderRadius:6,maxBarThickness:20}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ' 平均 '+ctx.parsed.x.toLocaleString()+'円/kg（'+fmt(byProd[ctx.label].qty)+'kg）';}}}},
-        scales:{x:{ticks:{font:{size:10},color:'#a8a098',callback:function(v){return v.toLocaleString();}},grid:{color:'rgba(0,0,0,0.05)'},beginAtZero:true},
-                y:{ticks:{font:Object.assign({size:11},jpFont),color:'#5a564e'},grid:{display:false}}}}}));
+    c3.setOption({
+      animationDuration:500,
+      tooltip:{trigger:'item',confine:true,backgroundColor:'rgba(28,26,23,0.94)',borderWidth:0,
+        textStyle:{color:'#fff',fontSize:12,fontFamily:EC_FONT},
+        formatter:function(pp){return pp.name+'<br>平均 <b>'+Math.round(pp.value).toLocaleString()+'円/kg</b>（'+ecKg(byProd[pp.name].qty)+'）';}},
+      grid:{left:8,right:46,top:6,bottom:6,containLabel:true},
+      xAxis:Object.assign(ecAxisY(function(v){return v.toLocaleString();}),{type:'value'}),
+      yAxis:{type:'category',data:pNames,axisLine:{show:false},axisTick:{show:false},
+        axisLabel:{fontSize:11,color:'#5a564e',fontFamily:EC_FONT}},
+      series:[{type:'bar',barMaxWidth:18,
+        data:pNames.map(function(n,i){return {value:Math.round(byProd[n].amt/byProd[n].qty),
+          itemStyle:{color:i===pNames.length-1?'#c89b3c':'rgba(58,107,69,0.7)',borderRadius:[0,5,5,0]}};}),
+        label:{show:true,position:'right',fontSize:10,color:'#5a564e',fontFamily:EC_FONT,
+          formatter:function(pp){return Math.round(pp.value).toLocaleString();}}}]
+    });
   }
 
   // --- 4) 品種別 数量・金額 ---
   var byVar={};
   ftrades.forEach(function(t){ var v=t.variety||'品種不明'; if(!byVar[v])byVar[v]={qty:0,amt:0}; byVar[v].qty+=(t.totalQty||0); byVar[v].amt+=tradeAmount(t); });
   var vNames=Object.keys(byVar).sort(function(a,b){return byVar[b].qty-byVar[a].qty;}).slice(0,8);
-  var c4=document.getElementById('ov-variety');
+  var c4=ecInit('ov-variety');
   if(c4&&vNames.length){
-    _ovCharts.push(new Chart(c4,{type:'bar',
-      data:{labels:vNames,datasets:[
-        {label:'数量(kg)',data:vNames.map(function(n){return Math.round(byVar[n].qty);}),backgroundColor:'rgba(58,107,69,0.65)',borderRadius:6,maxBarThickness:24,yAxisID:'y'},
-        {label:'金額(万円)',data:vNames.map(function(n){return Math.round(byVar[n].amt/10000);}),backgroundColor:'rgba(200,155,60,0.65)',borderRadius:6,maxBarThickness:24,yAxisID:'y2'}]},
-      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-        plugins:{legend:{display:true,labels:{font:Object.assign({size:11},jpFont),boxWidth:14}},
-          tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+ctx.parsed.y.toLocaleString();}}}},
-        scales:{x:{ticks:{font:Object.assign({size:10},jpFont),color:'#5a564e',maxRotation:30},grid:{display:false}},
-                y:{position:'left',beginAtZero:true,ticks:{font:{size:10},color:'#3a6b45'},grid:{color:'rgba(0,0,0,0.05)'}},
-                y2:{position:'right',beginAtZero:true,grid:{display:false},ticks:{font:{size:10},color:'#c89b3c'}}}}}));
+    c4.setOption({
+      animationDuration:500,
+      tooltip:Object.assign(ecTooltip(),{formatter:function(ps){
+        var h='<div style="font-weight:700;margin-bottom:4px;">'+ps[0].axisValue+'</div>';
+        ps.forEach(function(pp){ h+=pp.marker+' '+pp.seriesName+'：<b>'+(pp.seriesName.indexOf('金額')>=0?ecMoney(pp.value):ecKg(pp.value))+'</b><br>'; });
+        return h; }}),
+      legend:{top:0,textStyle:{fontSize:11,fontFamily:EC_FONT},itemWidth:14,itemHeight:9},
+      grid:{left:8,right:8,top:30,bottom:6,containLabel:true},
+      xAxis:Object.assign(ecAxisX(vNames),{axisLabel:{fontSize:10,color:'#5a564e',fontFamily:EC_FONT,interval:0,rotate:vNames.length>5?28:0}}),
+      yAxis:[ecAxisY(ecKg,'#3a6b45'),Object.assign(ecAxisY(ecMoney,'#c89b3c'),{splitLine:{show:false}})],
+      series:[
+        {name:'数量',type:'bar',data:vNames.map(function(n){return Math.round(byVar[n].qty);}),
+         itemStyle:{color:'rgba(58,107,69,0.75)',borderRadius:[4,4,0,0]},barMaxWidth:20},
+        {name:'金額',type:'bar',yAxisIndex:1,data:vNames.map(function(n){return Math.round(byVar[n].amt);}),
+         itemStyle:{color:'rgba(200,155,60,0.75)',borderRadius:[4,4,0,0]},barMaxWidth:20}
+      ]
+    });
   }
 
   // --- 5) 累積出荷量 ---
-  var c5=document.getElementById('ov-cumu');
+  var c5=ecInit('ov-cumu');
   if(c5&&dts.length){
     var cum=0;
     var cumData=dts.map(function(d){ cum+=byDate[d].qty; return Math.round(cum); });
-    _ovCharts.push(new Chart(c5,{type:'line',
-      data:{labels:dts.map(function(d){return d.slice(5);}),
-        datasets:[{label:'累積数量',data:cumData,borderColor:'#3a6b45',backgroundColor:'rgba(58,107,69,0.12)',fill:true,tension:0.25,pointRadius:2,borderWidth:2.5}]},
-      options:Object.assign({},baseOpts,{
-        plugins:Object.assign({},baseOpts.plugins,{
-          zoom:{pan:{enabled:true,mode:'x'},zoom:{pinch:{enabled:true},wheel:{enabled:true},mode:'x'}},
-          tooltip:Object.assign({},baseOpts.plugins.tooltip,{callbacks:{label:function(ctx){return ' 累積 '+fmt(ctx.parsed.y)+'kg';}}})
-        })
-      })}));
+    c5.setOption({
+      animationDuration:500,
+      tooltip:Object.assign(ecTooltip(),{formatter:function(ps){
+        return '<div style="font-weight:700;">'+ps[0].axisValue+'</div>累積 <b>'+ecKg(ps[0].value)+'</b>';}}),
+      grid:{left:8,right:14,top:14,bottom:46,containLabel:true},
+      dataZoom:ecZoomXY(),
+      xAxis:ecAxisX(dLabels),
+      yAxis:ecAxisY(ecKg),
+      series:[{type:'line',data:cumData,smooth:0.25,symbolSize:5,showSymbol:false,
+        lineStyle:{width:3,color:'#3a6b45'},itemStyle:{color:'#3a6b45'},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+          colorStops:[{offset:0,color:'rgba(58,107,69,0.28)'},{offset:1,color:'rgba(58,107,69,0.02)'}]}}}]
+    });
   }
 }
 
-/* ===== 荷口単価対応：金額計算ヘルパー ===== */
+/* ===== 生産家別グラフ（ECharts） ===== */
+function renderProducerChartsEc(){
+  if(typeof echarts==='undefined') return;
+  var sel=document.getElementById('analyze-producer-select');
+  if(!sel) return;
+  var pid=parseInt(sel.value);
+  var pTrades=getFilteredTrades().filter(function(t){return t.producerId===pid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+
+  var pc=ecInit('producer-price-chart');
+  var qc=ecInit('producer-qty-chart');
+  if(!pTrades.length){
+    if(pc) pc.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}});
+    if(qc) qc.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}});
+    return;
+  }
+
+  // 売り先×品種で系列化
+  var allBuyers=partners.filter(function(p){return p.type==='chasho';});
+  var dateSet={}, allDates=[];
+  pTrades.forEach(function(t){if(t.date&&!dateSet[t.date]){dateSet[t.date]=1;allDates.push(t.date);}});
+  allDates.sort();
+  var labels=allDates.map(function(d){return d.slice(5).replace('-','/');});
+
+  var groups={};
+  pTrades.forEach(function(t){
+    var b=allBuyers.find(function(p){return p.id===t.buyerId;});
+    var bn=b?b.name:'売先未設定';
+    var vari=t.variety||'品種不明';
+    var key=bn+'__'+vari;
+    if(!groups[key]) groups[key]={buyer:bn,variety:vari,byDate:{}};
+    if(!groups[key].byDate[t.date]) groups[key].byDate[t.date]=[];
+    groups[key].byDate[t.date].push(t);
+  });
+  var multiVariety={};
+  Object.keys(groups).forEach(function(k){ multiVariety[groups[k].buyer]=(multiVariety[groups[k].buyer]||0)+1; });
+
+  var seriesDefs=Object.keys(groups).sort().map(function(k,i){
+    var g=groups[k];
+    var name=multiVariety[g.buyer]>1?g.buyer+'('+g.variety+')':g.buyer;
+    var prices=allDates.map(function(d){
+      var ts=g.byDate[d]||[]; if(!ts.length) return null;
+      var q=0,a=0; ts.forEach(function(t){ q+=(t.totalQty||0); a+=tradeAmount(t); });
+      return q>0?Math.round(a/q):null;
+    });
+    var qtys=allDates.map(function(d){
+      var ts=g.byDate[d]||[]; var q=ts.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
+      return q>0?Math.round(q*10)/10:null;
+    });
+    return {name:name,prices:prices,qtys:qtys,color:EC_PALETTE[i%EC_PALETTE.length]};
+  });
+
+  var legendOpt={type:'scroll',top:0,textStyle:{fontSize:10,fontFamily:EC_FONT},itemWidth:14,itemHeight:9,pageIconSize:10};
+
+  if(pc){
+    pc.setOption({
+      animationDuration:400,
+      tooltip:Object.assign(ecTooltip(),{formatter:function(ps){
+        var h='<div style="font-weight:700;margin-bottom:4px;">'+ps[0].axisValue+'</div>';
+        var any=false;
+        ps.forEach(function(pp){ if(pp.value==null)return; any=true;
+          h+=pp.marker+' '+pp.seriesName+'：<b>'+Math.round(pp.value).toLocaleString()+'円/kg</b><br>'; });
+        return any?h:null; }}),
+      legend:legendOpt,
+      grid:{left:8,right:14,top:34,bottom:46,containLabel:true},
+      dataZoom:ecZoomXY(),
+      xAxis:ecAxisX(labels),
+      yAxis:Object.assign(ecAxisY(function(v){return v.toLocaleString();}),{scale:true}),
+      series:seriesDefs.map(function(sd){
+        return {name:sd.name,type:'line',data:sd.prices,connectNulls:true,smooth:0.3,
+          symbolSize:7,lineStyle:{width:2.5,color:sd.color},
+          itemStyle:{color:sd.color,borderColor:'#fff',borderWidth:2},
+          emphasis:{focus:'series'}};
+      })
+    });
+  }
+  if(qc){
+    qc.setOption({
+      animationDuration:400,
+      tooltip:Object.assign(ecTooltip(),{formatter:function(ps){
+        var h='<div style="font-weight:700;margin-bottom:4px;">'+ps[0].axisValue+'</div>';
+        var tot=0,any=false;
+        ps.forEach(function(pp){ if(pp.value==null)return; any=true; tot+=pp.value;
+          h+=pp.marker+' '+pp.seriesName+'：<b>'+ecKg(pp.value)+'</b><br>'; });
+        if(any&&ps.filter(function(pp){return pp.value!=null;}).length>1) h+='<div style="margin-top:3px;border-top:1px solid rgba(255,255,255,0.25);padding-top:3px;">合計 <b>'+ecKg(tot)+'</b></div>';
+        return any?h:null; }}),
+      legend:legendOpt,
+      grid:{left:8,right:14,top:34,bottom:46,containLabel:true},
+      dataZoom:ecZoomXY(),
+      xAxis:ecAxisX(labels),
+      yAxis:ecAxisY(ecKg),
+      series:seriesDefs.map(function(sd){
+        return {name:sd.name,type:'bar',stack:'qty',data:sd.qtys,barMaxWidth:24,
+          itemStyle:{color:sd.color},emphasis:{focus:'series'}};
+      })
+    });
+  }
+}
+
+/* ===== 荷口単価対応：金額計算ヘルパー ===== *//* ===== 荷口単価対応：金額計算ヘルパー ===== */
 function lotPrice(t,l){ return (l&&l.price!=null&&l.price>0)?l.price:(t.price||0); }
 function tradeAmount(t){
   if(t.lots&&t.lots.length){
