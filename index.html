@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-M</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-N</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-M</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-N</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2206,8 +2206,18 @@ function showCalTab(tab){
 // activityLog: {date: {producerId: 'active'|'rest'|''}}
 var activityLog = {};
 
+function _cleanPastActivity(){
+  // 昨日以前の手入力（稼働/休み）は取引記録を正とするため掃除する（未来は残す）
+  var today=new Date().toISOString().split('T')[0];
+  var changed=false;
+  Object.keys(activityLog).forEach(function(d){
+    if(d<today){ delete activityLog[d]; changed=true; }
+  });
+  if(changed){ try{ _safeLS.setItem('ocha_activity_log', JSON.stringify(activityLog)); }catch(e){} }
+}
 function loadActivityLog(){
   try{ activityLog=JSON.parse(_safeLS.getItem('ocha_activity_log')||'{}'); }catch(e){ activityLog={}; }
+  _cleanPastActivity();
 }
 function saveActivityLog(){
   _safeLS.setItem('ocha_activity_log', JSON.stringify(activityLog));
@@ -2280,6 +2290,13 @@ function setActivityDate(date){
   renderActivityCheck();
 }
 function cycleActivity(date, pid){
+  var today=new Date().toISOString().split('T')[0];
+  // 確定日（昨日以前、または当日その生産家に取引あり）は取引記録が正。手入力不可。
+  var hasTx = trades.some(function(t){ return t.date===date && t.producerId===pid; });
+  if(date<today || hasTx){
+    toast(date<today?'過去の日は取引記録から自動表示されます':'この日は取引が入力済みのため確定表示です');
+    return;
+  }
   if(navigator.vibrate) navigator.vibrate(8);
   loadActivityLog();
   if(!activityLog[date]) activityLog[date]={};
@@ -2412,13 +2429,19 @@ function renderGanttMonth(){
       // 稼働記録 OR 取引記録があれば●
       var st=(activityLog[ds4]||{})[p.id]||'';
       var hasTx=!!(txByProd[p.id]&&txByProd[p.id][ds4]);
-      var isPastOrToday = ds4<=today;
-      // 手動の稼働/休み記録を最優先。なければ「過去日かつ取引あり」を自動○
+      // 確定（過去扱い）の条件：昨日以前、または その日に取引がある（＝当日でも取引が入れば確定）
+      var confirmed = (ds4<today) || hasTx;
       var bg,icon,col;
-      if(st==='active'){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
-      else if(st==='rest'){ bg='#f5a0a0'; icon='×'; col='#c0392b'; }
-      else if(hasTx && isPastOrToday){ bg='#d8efd8'; icon='○'; col='#2e7d32'; } // 取引から自動
-      else { bg=''; icon=''; col='var(--border)'; }
+      if(confirmed){
+        // 確定日：取引記録だけを正とする（手入力は無視）。取引あり=●、なし=空白
+        if(hasTx){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
+        else { bg=''; icon=''; col='var(--border)'; }
+      } else {
+        // 未来（今日で取引未入力を含む）：手入力の予定を残す
+        if(st==='active'){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
+        else if(st==='rest'){ bg='#f5a0a0'; icon='×'; col='#c0392b'; }
+        else { bg=''; icon=''; col='var(--border)'; }
+      }
       var _t4=ds4===today;
       html+='<td onclick="cycleActivity(\''+ds4+'\','+p.id+')" style="padding:2px;border:1px solid '+(_t4?'var(--gold)':'var(--border)')+';border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;background:'+(bg||( _t4?'rgba(200,155,60,0.10)':''))+';font-size:12px;font-weight:700;color:'+col+';min-width:28px;cursor:pointer;user-select:none;">'+icon+'</td>';
     }
