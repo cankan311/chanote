@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-O</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-P</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-O</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-P</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2298,13 +2298,15 @@ function setActivityDate(date){
 function cycleActivity(date, pid){
   var today=new Date().toISOString().split('T')[0];
   var hasTx = trades.some(function(t){ return t.date===date && t.producerId===pid; });
-  // 取引がある日は事実なので●固定。手入力不可。
   if(hasTx){ toast('この日は取引があるため●で確定です'); return; }
+  // 今日でも既に取引が1件でもあれば、その日は確定（過去扱い）。△のみ手動可。
+  var dayHasAnyTx = trades.some(function(t){ return t.date===date; });
+  var isPast = (date<today) || (date===today && dayHasAnyTx);
   if(navigator.vibrate) navigator.vibrate(8);
   loadActivityLog();
   if(!activityLog[date]) activityLog[date]={};
   var cur = activityLog[date][pid]||'';
-  if(date<today){
+  if(isPast){
     // 過去・取引なし：空白 ⇄ △（稼働したが取引なし）
     var nx = cur==='worked' ? '' : 'worked';
     if(nx==='') delete activityLog[date][pid]; else activityLog[date][pid]=nx;
@@ -2380,11 +2382,14 @@ function renderGanttMonth(){
 
   // 取引マップ（生産家別）
   var txByProd={};
+  var _todayStr=new Date().toISOString().split('T')[0];
+  var todayHasAnyTx=false;
   trades.forEach(function(t){
     if(t.date&&t.date.slice(0,7)===ym){
       if(!txByProd[t.producerId]) txByProd[t.producerId]={};
       txByProd[t.producerId][t.date]=1;
     }
+    if(t.date===_todayStr) todayHasAnyTx=true;
   });
 
   // 天気を取得（非同期）
@@ -2440,8 +2445,8 @@ function renderGanttMonth(){
       // 稼働記録 OR 取引記録があれば●
       var st=(activityLog[ds4]||{})[p.id]||'';
       var hasTx=!!(txByProd[p.id]&&txByProd[p.id][ds4]);
-      // 確定（過去扱い）の条件：昨日以前、または その日に取引がある（＝当日でも取引が入れば確定）
-      var confirmed = (ds4<today) || hasTx;
+      // 確定（過去扱い）：昨日以前 ／ 今日でも既に取引が1件でもあれば確定 ／ その生産家に取引がある
+      var confirmed = (ds4<today) || (ds4===today && todayHasAnyTx) || hasTx;
       var bg,icon,col;
       if(confirmed){
         // 取引あり=●が最優先。取引なしの過去日は手動△（稼働したが取引なし）を許可
