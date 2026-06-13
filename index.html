@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-N</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-O</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-N</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-O</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2207,11 +2207,17 @@ function showCalTab(tab){
 var activityLog = {};
 
 function _cleanPastActivity(){
-  // 昨日以前の手入力（稼働/休み）は取引記録を正とするため掃除する（未来は残す）
+  // 昨日以前の手入力のうち ●(active)/×(rest) は取引記録を正とするため掃除。△(worked)は残す。
   var today=new Date().toISOString().split('T')[0];
   var changed=false;
   Object.keys(activityLog).forEach(function(d){
-    if(d<today){ delete activityLog[d]; changed=true; }
+    if(d<today){
+      var day=activityLog[d]||{};
+      Object.keys(day).forEach(function(pid){
+        if(day[pid]!=='worked'){ delete day[pid]; changed=true; }
+      });
+      if(!Object.keys(day).length){ delete activityLog[d]; }
+    }
   });
   if(changed){ try{ _safeLS.setItem('ocha_activity_log', JSON.stringify(activityLog)); }catch(e){} }
 }
@@ -2291,16 +2297,21 @@ function setActivityDate(date){
 }
 function cycleActivity(date, pid){
   var today=new Date().toISOString().split('T')[0];
-  // 確定日（昨日以前、または当日その生産家に取引あり）は取引記録が正。手入力不可。
   var hasTx = trades.some(function(t){ return t.date===date && t.producerId===pid; });
-  if(date<today || hasTx){
-    toast(date<today?'過去の日は取引記録から自動表示されます':'この日は取引が入力済みのため確定表示です');
-    return;
-  }
+  // 取引がある日は事実なので●固定。手入力不可。
+  if(hasTx){ toast('この日は取引があるため●で確定です'); return; }
   if(navigator.vibrate) navigator.vibrate(8);
   loadActivityLog();
   if(!activityLog[date]) activityLog[date]={};
   var cur = activityLog[date][pid]||'';
+  if(date<today){
+    // 過去・取引なし：空白 ⇄ △（稼働したが取引なし）
+    var nx = cur==='worked' ? '' : 'worked';
+    if(nx==='') delete activityLog[date][pid]; else activityLog[date][pid]=nx;
+    if(!Object.keys(activityLog[date]).length) delete activityLog[date];
+    saveActivityLog(); renderGanttMonth();
+    return;
+  }
   var next = cur===''?'active':cur==='active'?'rest':'';
   if(next==='') delete activityLog[date][pid];
   else activityLog[date][pid]=next;
@@ -2337,7 +2348,7 @@ function renderGantt(){
     +'</select>'
     +'<button onclick="ganttNextMonth()" style="padding:8px 14px;font-size:16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);cursor:pointer;">›</button>'
     +'</div>';
-  html+='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;">マスをタップ：空白→●稼働→×休み→空白　｜　日付/天気タップで詳細</div>';
+  html+='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;">過去:タップで△稼働(取引なし)　未来:●稼働→×休み　｜　日付/天気タップで詳細</div>';
   html+='<div id="gantt-month-area"></div>';
   html+='<div id="gantt-weather-detail" style="display:none;margin-top:8px;"></div>';
   el.innerHTML=html;
@@ -2433,13 +2444,15 @@ function renderGanttMonth(){
       var confirmed = (ds4<today) || hasTx;
       var bg,icon,col;
       if(confirmed){
-        // 確定日：取引記録だけを正とする（手入力は無視）。取引あり=●、なし=空白
+        // 取引あり=●が最優先。取引なしの過去日は手動△（稼働したが取引なし）を許可
         if(hasTx){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
+        else if(st==='worked'){ bg='#eaf5ea'; icon='△'; col='#2e7d32'; }
         else { bg=''; icon=''; col='var(--border)'; }
       } else {
         // 未来（今日で取引未入力を含む）：手入力の予定を残す
         if(st==='active'){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
         else if(st==='rest'){ bg='#f5a0a0'; icon='×'; col='#c0392b'; }
+        else if(st==='worked'){ bg='#eaf5ea'; icon='△'; col='#2e7d32'; }
         else { bg=''; icon=''; col='var(--border)'; }
       }
       var _t4=ds4===today;
