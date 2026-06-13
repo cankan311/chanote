@@ -628,11 +628,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
   <!-- 取引記録フォーム -->
   <div class="card">
     <div class="field-group"><label>📅 取引日</label><input type="date" id="t-date"></div>
-    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="priceAdvisor();liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>🏪 売先</label><select id="t-buyer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>品種</label><select id="t-variety" onchange="priceAdvisor()"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview();priceAdvisor();liveCalc()"></div>
-    <div id="price-advisor"></div>
+    <div class="field-group"><label>品種</label><select id="t-variety"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview();liveCalc()"></div>
     <div class="section-label" style="margin-top:4px;">荷口・数量</div>
     <div id="lot-list"></div>
     <button class="add-lot-btn" onclick="addLot()">＋ 荷口を追加する</button>
@@ -804,7 +803,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
   <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--paper2);padding:4px;border-radius:10px;">
     <button id="analyze-tab-summary" onclick="showAnalyzeTab('summary')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--matcha);color:#fff;">📊 集計</button>
     <button id="analyze-tab-graph"   onclick="showAnalyzeTab('graph')"   style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📈 グラフ</button>
-    <button id="analyze-tab-pace" onclick="showAnalyzeTab('pace')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">🚚 出荷</button>
     <button id="analyze-tab-forecast" onclick="showAnalyzeTab('forecast')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">🔮 予測</button>
   </div>
   <div id="analyze-content"></div>
@@ -833,7 +831,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
     <button class="market-tab-btn active" id="mtab-btn-souba" onclick="switchMarketTab('souba',this)">📊 相場・茶況</button>
     <button class="market-tab-btn" id="mtab-btn-major" onclick="switchMarketTab('major',this)">🏢 大手動向</button>
     <button class="market-tab-btn" id="mtab-btn-matching" onclick="switchMarketTab('matching',this)">🌱 後継者</button>
-    <button class="market-tab-btn" id="mtab-btn-intel" onclick="switchMarketTab('intel',this)">🌐 最新情報</button>
+    <button class="market-tab-btn" id="mtab-btn-export" onclick="switchMarketTab('export',this)">🌏 輸出・農薬基準</button>
+    <button class="market-tab-btn" id="mtab-btn-support" onclick="switchMarketTab('support',this)">💰 補助金・基盤・後継</button>
     <button class="market-tab-btn" id="mtab-btn-links" onclick="switchMarketTab('links',this)">🔗 公式</button>
   </div>
 
@@ -849,6 +848,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.1em;margin-bottom:10px;">質問内容のプレビュー</div>
       <div style="font-size:12px;color:var(--ink2);line-height:1.9;" id="preview-souba"></div>
     </div>
+
+    <div class="section-label">📈 相場・茶況の記録ボード</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px;">日々の相場観・茶況を貯めて時系列で振り返れます。下のボタンで今日の相場メモを追加。「相場」タグのメモがここに集まります。</div>
+    <button onclick="addSoubaMemo()" style="width:100%;padding:12px;font-size:14px;font-weight:700;border-radius:12px;background:var(--gold-light);color:var(--gold);border:1.5px solid var(--gold-mid);cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:12px;">➕ 今日の相場・茶況を記録</button>
+    <div id="souba-board"></div>
   </div>
 
   <!-- 大手動向 -->
@@ -886,30 +890,40 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
     </div>
   </div>
 
-  <!-- 最新情報（インテリジェンス） -->
-  <div id="mtab-intel" class="market-tab-content" style="display:none;">
-    <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px;padding:10px 14px;background:var(--matcha-light);border-radius:var(--radius-sm);">
-      お茶業界の「いま」を1か所に。各ボタンで<b>最新情報＋出典リンク＋AI要約・今後の展望</b>をまとめてClaudeに依頼できます。下の公式ソースはタップで直接開けます（常に最新）。
+  <!-- 輸出・農薬基準(MRL) -->
+  <div id="mtab-export" class="market-tab-content" style="display:none;">
+    <div style="font-size:12px;color:var(--ink2);line-height:1.8;margin-bottom:14px;padding:11px 14px;background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:var(--radius-sm);">
+      <b>本物の一次情報に直行します。</b>各国の茶の残留農薬基準(MRL)の改定や「どの薬剤がどの国で何ppmで承認されたか」は、下記の協議会ページが日付つきで更新し続けています。Claudeに聞くより速く正確です。
     </div>
-
-    <div class="section-label" style="margin-top:0;">🤖 AIに最新をまとめてもらう</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <button onclick="copyPrompt('intel_daily')" style="padding:13px 8px;font-size:12px;font-weight:700;border-radius:12px;background:var(--matcha);color:#fff;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 3px 10px rgba(58,107,69,0.25);">📰 今日の茶業ニュース総まとめ</button>
-      <button onclick="copyPrompt('intel_export')" style="padding:13px 8px;font-size:12px;font-weight:700;border-radius:12px;background:var(--matcha);color:#fff;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 3px 10px rgba(58,107,69,0.25);">🌏 輸出入・海外需要の最新</button>
-      <button onclick="copyPrompt('intel_overseas')" style="padding:13px 8px;font-size:12px;font-weight:700;border-radius:12px;background:var(--gold);color:#fff;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 3px 10px rgba(138,106,42,0.25);">🍵 抹茶・海外トレンド</button>
-      <button onclick="copyPrompt('intel_weekly')" style="padding:13px 8px;font-size:12px;font-weight:700;border-radius:12px;background:var(--gold);color:#fff;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 3px 10px rgba(138,106,42,0.25);">📅 今週の動き＆来週の展望</button>
-    </div>
-    <div style="font-size:10px;color:var(--hint);text-align:center;margin-bottom:18px;">ボタン→Claudeに貼り付けで、出典リンク付きの要約が返ります</div>
-
-    <div class="section-label">🔗 ワンタップで最新ソース</div>
+    <div class="section-label" style="margin-top:0;">残留農薬基準(MRL)・輸出</div>
     <div class="card" style="padding:14px;margin-bottom:8px;">
-      <a class="market-link" href="https://news.google.com/search?q=日本茶%20OR%20荒茶%20OR%20抹茶%20相場&hl=ja&gl=JP" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">📰 Googleニュース「日本茶・荒茶・抹茶」</span><span style="color:var(--hint);font-size:18px;">›</span></a>
-      <a class="market-link" href="https://nihon-cha.or.jp/export/exporting/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🌏 日本茶輸出促進協議会 月次輸出状況</span><span style="color:var(--hint);font-size:18px;">›</span></a>
-      <a class="market-link" href="https://chaichiba.co.jp/category/report/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">📋 静岡茶市場 成立日報（最新価格）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
-      <a class="market-link" href="https://chaichiba.co.jp/torihiki/seiiku/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🌱 静岡茶市場 生育状況</span><span style="color:var(--hint);font-size:18px;">›</span></a>
-      <a class="market-link" href="https://www.jetro.go.jp/news/?_keyword=%E8%8C%B6" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🌐 JETRO 茶 関連ニュース</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://nihon-cha.or.jp/export/mrl_docs/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🧪 日本茶輸出促進協議会 MRL関連資料（国別・最新改定）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://nihon-cha.or.jp/export/mrl_docs/historical-data/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🗂 MRL関連資料 過去の更新一覧</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://nihon-cha.or.jp/export/reference/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">📋 輸出相手国のMRL検索マニュアル（参考情報）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://www.naro.go.jp/publicity_report/publication/pamphlet/tech-pamph/165328.html" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🌿 農研機構 輸出対応型 防除暦の作成指針</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://nihon-cha.or.jp/export/exporting/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">📈 日本茶 月次輸出状況（量・額・国別）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+    </div>
+    <div style="font-size:11px;color:var(--hint);line-height:1.7;padding:0 4px;">※ 各国の基準は予告なく改定されます。出荷前に最新の協議会資料で必ずご確認ください。</div>
+  </div>
+
+  <!-- 補助金・基盤整備・後継者 -->
+  <div id="mtab-support" class="market-tab-content" style="display:none;">
+    <div style="font-size:12px;color:var(--ink2);line-height:1.8;margin-bottom:14px;padding:11px 14px;background:var(--gold-light);border:1px solid var(--gold-mid);border-radius:var(--radius-sm);">
+      高齢化でリタイアする生産家の畑をどうするか——<b>農地バンクでの集約・基盤整備・補助金</b>の入口を1か所に。静岡の飛び地茶園の基盤整備事例や公募中の補助金へ直行できます。
+    </div>
+    <div class="section-label" style="margin-top:0;">補助金・基盤整備</div>
+    <div class="card" style="padding:14px;margin-bottom:8px;">
+      <a class="market-link" href="https://www.pref.shizuoka.jp/kensei/introduction/soshiki/1002123/1041029/1027271.html" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🍵 静岡県 お茶振興課（基盤整備・振興計画・公募）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://www.maff.go.jp/kanto/chiikinet/shizuoka/cha_torikumijirei.pdf" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">📑 関東農政局 静岡 茶業 補助事業 取組事例集（基盤整備）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://hojyokin-portal.jp/subsidies/list?pref_id=22" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">💴 静岡県の補助金・支援金 一覧（公募中）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
       <a class="market-link" href="https://www.maff.go.jp/j/seisan/tokusan/cha/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🏛 農林水産省 茶をめぐる情勢</span><span style="color:var(--hint);font-size:18px;">›</span></a>
-      <a class="market-link" href="https://shokuhin.net/?s=%E6%97%A5%E6%9C%AC%E8%8C%B6" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🗞 食品産業新聞 日本茶記事</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+    </div>
+    <div class="section-label">農地の集約・後継者・新規就農</div>
+    <div class="card" style="padding:14px;margin-bottom:8px;">
+      <a class="market-link" href="https://www.maff.go.jp/j/keiei/koukai/kikou/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🗺 農地バンク（農地中間管理機構）全国窓口</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://www.maff.go.jp/j/new_farmer/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🌱 農林水産省 新規就農の支援</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://www.be-farmer.jp/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🤝 農業をはじめる.JP</span><span style="color:var(--hint);font-size:18px;">›</span></a>
+      <a class="market-link" href="https://www.pref.shizuoka.jp/sangyou/sa-610/" target="_blank"><span style="font-size:13px;color:var(--ink);font-weight:600;">🍃 静岡県 茶業振興（県の窓口）</span><span style="color:var(--hint);font-size:18px;">›</span></a>
     </div>
   </div>
 
@@ -1086,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.15-H</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.16-K</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1207,6 +1221,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
     </div>
     <!-- メモ一覧 -->
     <div id="memo-view-list" style="display:none;">
+      <div style="position:relative;margin-bottom:10px;">
+        <input type="text" id="memo-search" oninput="renderMemoList()" placeholder="🔎 全メモ・取引先メモを横断検索（例：○○さん／値上げ／病気）" style="width:100%;padding:11px 34px 11px 14px;font-size:14px;border:1.5px solid var(--matcha-mid);border-radius:12px;background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;">
+        <button onclick="document.getElementById('memo-search').value='';renderMemoList();" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:16px;color:var(--hint);cursor:pointer;padding:6px;">✕</button>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;" id="memo-tag-filter">
         <button onclick="filterMemoTag('')"       class="memo-ftag active" style="padding:4px 10px;font-size:11px;border-radius:12px;border:1px solid var(--matcha);background:var(--matcha);color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">すべて</button>
         <button onclick="filterMemoTag('相場')"   class="memo-ftag" style="padding:4px 10px;font-size:11px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">相場</button>
@@ -1376,17 +1394,17 @@ function _applyData(data){
 }
 
 function _saveToLocalStorage(){
-  try{
-    _safeLS.setItem('ocha_partners',JSON.stringify(partners));
-    _safeLS.setItem('ocha_trades4',JSON.stringify(trades));
-    _safeLS.setItem('ocha_components',JSON.stringify(components));
-    _safeLS.setItem('ocha_varieties',JSON.stringify(varieties));
-    _safeLS.setItem('ocha_teai_images',JSON.stringify(teaiImages));
-    _safeLS.setItem('ocha_season_defs',JSON.stringify(seasonDefs));
-    _safeLS.setItem('ocha_rest_days',JSON.stringify(restDays));
-    _safeLS.setItem('ocha_orders',JSON.stringify(orders));
-    if(analyzeOrder) _safeLS.setItem('ocha_analyze_order',JSON.stringify(analyzeOrder));
-  }catch(e){}
+  function _set(k,v){ try{ _safeLS.setItem(k, v); return true; }catch(e){ return false; } }
+  _set('ocha_partners',JSON.stringify(partners));
+  _set('ocha_trades4',JSON.stringify(trades));
+  _set('ocha_components',JSON.stringify(components));
+  _set('ocha_varieties',JSON.stringify(varieties));
+  // 手合わせ帳は最後に独立保存（容量超過しても他データを巻き込まない）
+  _set('ocha_season_defs',JSON.stringify(seasonDefs));
+  _set('ocha_rest_days',JSON.stringify(restDays));
+  _set('ocha_orders',JSON.stringify(orders));
+  if(analyzeOrder) _set('ocha_analyze_order',JSON.stringify(analyzeOrder));
+  _set('ocha_teai_images',JSON.stringify(teaiImages));
 }
 
 var _unsaved = false;
@@ -1710,7 +1728,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.15-H</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.16-K</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2091,16 +2109,58 @@ function filterMemoTag(tag){
   });
   renderMemoList();
 }
+function _hl(text, q){
+  text=String(text||'');
+  if(!q) return escText(text);
+  try{
+    var re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    return escText(text).replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#ffe08a;color:inherit;padding:0 1px;border-radius:2px;">$1</mark>');
+  }catch(e){ return escText(text); }
+}
 function renderMemoList(){
   var el = document.getElementById('memo-list-content'); if(!el) return;
+  var q = (document.getElementById('memo-search')||{value:''}).value.trim();
+  var ql = q.toLowerCase();
+
+  // メモ（検索 + タグ絞り込み）
   var list = allMemos.filter(function(m){
-    return !_memoFilterTag || (m.tags&&m.tags.indexOf(_memoFilterTag)>=0);
+    if(_memoFilterTag && !(m.tags&&m.tags.indexOf(_memoFilterTag)>=0)) return false;
+    if(!q) return true;
+    var hay = ((m.body||'')+' '+((m.tags||[]).join(' '))+' '+(m.date||'')).toLowerCase();
+    return hay.indexOf(ql)>=0;
   });
-  if(!list.length){
-    el.innerHTML='<div style="text-align:center;color:var(--hint);padding:24px;">メモがありません</div>';
+
+  // 取引先メモ（notes）も横断検索（検索語があるときだけ）
+  var pnotes = [];
+  if(q){
+    partners.forEach(function(p){
+      if(p.notes && ((p.name+' '+p.notes).toLowerCase().indexOf(ql)>=0)){
+        pnotes.push(p);
+      }
+    });
+  }
+
+  if(!list.length && !pnotes.length){
+    el.innerHTML='<div style="text-align:center;color:var(--hint);padding:24px;">'+(q?'「'+escText(q)+'」に一致するメモはありません':'メモがありません')+'</div>';
     return;
   }
-  el.innerHTML = list.map(function(m){
+
+  var html='';
+  if(q){
+    html+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">「<b style="color:var(--ink2);">'+escText(q)+'</b>」の検索結果：メモ '+list.length+'件'+(pnotes.length?' ／ 取引先メモ '+pnotes.length+'件':'')+'</div>';
+  }
+
+  if(pnotes.length){
+    html+='<div class="section-label" style="margin-top:0;">🏷 取引先メモ</div>';
+    html+=pnotes.map(function(p){
+      return '<div class="card" onclick="showPartnerDetail('+p.id+')" style="margin-bottom:10px;padding:12px 14px;border-left:3px solid var(--matcha);cursor:pointer;">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">'+_hl(p.name,q)+'<span style="font-size:10px;color:var(--hint);font-weight:400;"> ・'+(p.type==='producer'?'生産家':'茶商')+'</span></div>'
+        +'<div style="font-size:13px;color:var(--ink2);line-height:1.6;white-space:pre-wrap;">'+_hl(p.notes,q)+'</div></div>';
+    }).join('');
+    if(list.length) html+='<div class="section-label">📝 メモ</div>';
+  }
+
+  html += list.map(function(m){
     var tagHtml = (m.tags||[]).map(function(t){
       return '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fff3e0;color:#e65100;font-weight:600;">'+t+'</span>';
     }).join(' ');
@@ -2112,9 +2172,10 @@ function renderMemoList(){
       +'<button onclick="deleteMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">削除</button>'
       +'</div>'
       +'</div>'
-      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+escText(m.body)+'</div>'+memoAttachHtml(m)
+      +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+_hl(m.body,q)+'</div>'+memoAttachHtml(m)
       +'</div>';
   }).join('');
+  el.innerHTML=html;
 }
 function deleteMemo(id){
   id = Number(id);
@@ -2858,6 +2919,7 @@ function showPartnerDetail(id){
   html+='<button onclick="editPartner('+p.id+')" style="padding:8px 16px;font-size:13px;border-radius:20px;background:var(--matcha);color:#fff;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;box-shadow:0 2px 8px rgba(58,107,69,0.25);flex-shrink:0;">✏️ 編集</button>';
   html+='</div>';
   if(p.notes) html+='<div class="detail-box" style="font-size:13px;color:var(--muted);">📝 '+p.notes+'</div>';
+  html+=buildPartnerSummaryCard(p, myTrades);
   html+='<div class="stat-grid"><div class="stat-card"><div class="stat-label">取引件数</div><div class="stat-val">'+myTrades.length+'件</div></div><div class="stat-card"><div class="stat-label">累計数量</div><div class="stat-val">'+fmt(totalQty)+'kg</div></div></div>';
   html+='<div class="section-label">取引履歴</div>';
   if(!myTrades.length){html+='<div class="empty-state" style="padding:24px 0;">取引記録がありません</div>';}
@@ -3697,15 +3759,47 @@ function renderOperationStats(){
   el.innerHTML=html;
 }
 
+function _compressTeai(dataUrl, cb){
+  var img=new Image();
+  img.onload=function(){
+    var maxW=1600;
+    var scale=Math.min(1, maxW/img.width);
+    var w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+    var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    cv.getContext('2d').drawImage(img,0,0,w,h);
+    try{ cb(cv.toDataURL('image/jpeg',0.7)); }
+    catch(e){ cb(dataUrl); }
+  };
+  img.onerror=function(){ cb(dataUrl); };
+  img.src=dataUrl;
+}
+function _saveTeaiOnly(){
+  // 手合わせ帳だけを独立して保存し、容量超過を検出する
+  try{
+    _safeLS.setItem('ocha_teai_images', JSON.stringify(teaiImages));
+    return true;
+  }catch(e){ return false; }
+}
 function addTeaiImage(input){
   if(!selectedDate) return;
   var files=Array.from(input.files);
   files.forEach(function(file){
     var reader=new FileReader();
     reader.onload=function(e){
-      if(!teaiImages[selectedDate]) teaiImages[selectedDate]=[];
-      teaiImages[selectedDate].push({id:Date.now()+'_'+Math.random(),data:e.target.result});
-      save(); renderCalendar(); toast('手合わせ帳を保存しました');
+      _compressTeai(e.target.result, function(compressed){
+        if(!teaiImages[selectedDate]) teaiImages[selectedDate]=[];
+        var item={id:Date.now()+'_'+Math.random(),data:compressed};
+        teaiImages[selectedDate].push(item);
+        // 独立保存して容量を確認。失敗したら取り消してユーザーに通知
+        if(_saveTeaiOnly()){
+          renderCalendar(); renderCalTeai(); toast('手合わせ帳を保存しました');
+        } else {
+          teaiImages[selectedDate]=teaiImages[selectedDate].filter(function(x){return x.id!==item.id;});
+          if(!teaiImages[selectedDate].length) delete teaiImages[selectedDate];
+          alert('保存容量がいっぱいで、この写真を保存できませんでした。\n設定からバックアップを取り、古い手合わせ帳の写真を減らすと保存できるようになります。');
+          renderCalendar(); renderCalTeai();
+        }
+      });
     };
     reader.readAsDataURL(file);
   });
@@ -3715,7 +3809,7 @@ function deleteTeaiImage(date,id){
   if(!confirm('この画像を削除しますか？')) return;
   teaiImages[date]=(teaiImages[date]||[]).filter(function(img){return img.id!==id;});
   if(!teaiImages[date].length) delete teaiImages[date];
-  save(); renderCalendar(); toast('削除しました');
+  _saveTeaiOnly(); renderCalendar(); renderCalTeai(); toast('削除しました');
 }
 function renderCalTeai(){
   var sec=document.getElementById('cal-teai-section');
@@ -3748,7 +3842,7 @@ var analyzeTab = 'summary'; // 'summary' | 'graph' | 'forecast'
 
 function showAnalyzeTab(tab){
   analyzeTab = tab;
-  ['summary','graph','forecast','pace'].forEach(function(t){
+  ['summary','graph','forecast'].forEach(function(t){
     var btn = document.getElementById('analyze-tab-'+t);
     if(!btn) return;
     btn.style.background = t===tab ? 'var(--matcha)' : 'transparent';
@@ -4153,7 +4247,6 @@ function renderAnalyze(){
   });
 
   el.innerHTML=html;
-  if(analyzeTab==='pace'){ el.innerHTML=filterHTML+buildPaceBoard(); return; }
   if(analyzeTab==='graph' && ftrades.length) setTimeout(function(){renderOverviewCharts();},50);
   if(analyzeTab==='graph' && producers.length&&ftrades.length) setTimeout(function(){renderProducerCharts();},50);
 }
@@ -4910,6 +5003,29 @@ function switchMarketTab(id, btn){
   var target=document.getElementById('mtab-'+id);
   if(target) target.style.display='block';
   if(btn) btn.classList.add('active');
+  if(id==='souba') renderSoubaBoard();
+}
+function addSoubaMemo(){
+  openMemoModal();
+  var dt=document.getElementById('memo-date'); if(dt) dt.value=new Date().toISOString().split('T')[0];
+  // 「相場」タグを自動ON
+  setTimeout(function(){
+    document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
+      if(btn.dataset.tag==='相場' && btn.dataset.active!=='1'){ toggleMemoTag(btn,'相場'); }
+    });
+  },50);
+}
+function renderSoubaBoard(){
+  var el=document.getElementById('souba-board'); if(!el) return;
+  loadMemos();
+  var list=allMemos.filter(function(m){ return m.tags&&m.tags.indexOf('相場')>=0; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(!list.length){ el.innerHTML='<div style="font-size:12px;color:var(--hint);text-align:center;padding:18px;">まだ相場の記録はありません</div>'; return; }
+  el.innerHTML=list.slice(0,40).map(function(m){
+    return '<div class="card" style="margin-bottom:8px;padding:11px 13px;border-left:3px solid var(--gold);">'
+      +'<div style="font-size:10px;color:var(--hint);margin-bottom:4px;">'+(m.date||'')+'</div>'
+      +'<div style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">'+escText(m.body)+'</div>'+memoAttachHtml(m)+'</div>';
+  }).join('');
 }
 
 var MARKET_PROMPTS={
@@ -4917,10 +5033,6 @@ var MARKET_PROMPTS={
 
   major:'私は静岡県島田市で荒茶の斡旋業を営んでいます。以下の点について、最新情報をウェブ検索で調べて日本語で詳しく教えてください。\n\n①伊藤園・サントリー・コカコーラ・キリンなど大手飲料メーカーの荒茶・原料茶の調達動向\n②大手の国産茶の買付価格の変化や方針（値上げ・値下げ・数量の変化）\n③大手メーカーの最近の決算や原料費に関する発表\n④輸入茶との競合・国産茶シフトの動向\n⑤大手の動きが荒茶相場に与える影響\n\n荒茶の仕入れ・販売価格の判断材料として活用したいので、具体的な数字や事例を含めて教えてください。',
 
-  intel_daily:'あなたは日本茶業界の専門アナリストです。私は静岡県島田市で荒茶の斡旋業を営んでいます。本日時点の最新情報をウェブ検索で調べ、出典元のURLを必ず併記したうえで、日本語でまとめてください。\n\n①直近1週間の日本茶・荒茶・抹茶に関する主要ニュース（産地動向、価格、企業動向、行政の発表など）\n②それぞれの要点を3行以内で要約\n③斡旋業者の私にとっての影響・注目点\n④全体を踏まえた「今後の見通し・展望」\n\n各項目に必ず出典リンクを付けてください。',
-  intel_export:'あなたは日本茶輸出の専門家です。私は静岡県島田市で荒茶の斡旋業を営んでいます。最新情報をウェブ検索し、出典URLを併記して日本語でまとめてください。\n\n①最新月の日本茶の輸出量・輸出額と前年比（できれば日本茶輸出促進協議会の最新データ）\n②抹茶・粉末茶 vs リーフの内訳と伸び\n③主要輸出先（米国・EU・ASEAN）の需要動向\n④茶葉の輸入の増加傾向と国内需給への影響\n⑤これらが国内の荒茶相場・数量に与える影響の分析と今後の展望\n\n各データに出典リンクを付けてください。',
-  intel_overseas:'あなたは海外の日本茶トレンドに詳しいアナリストです。最新情報をウェブ検索し、出典URLを併記して日本語でまとめてください。\n\n①海外（特に米国・欧州）での抹茶・日本茶の最新需要トレンド\n②現地の価格・人気業態（カフェ、スイーツ、D2Cなど）\n③海外の供給不足・品薄や争奪戦に関する報道\n④日本の産地・メーカーの海外向けの新しい動き\n⑤斡旋業者として知っておくべき示唆と今後の展望\n\n各項目に出典リンクを付けてください。',
-  intel_weekly:'あなたは日本茶業界の専門アナリストです。私は静岡県島田市で荒茶の斡旋業を営んでいます。最新情報をウェブ検索し、出典URLを併記して日本語でまとめてください。\n\n①今週の日本茶業界の重要な動き（相場・天候・産地・企業・行政）を箇条書きで\n②先週からの変化のポイント\n③来週にかけての注目点と私が取るべき行動の示唆\n④全体の総括と今後1〜2か月の展望\n\n各項目に出典リンクを付けてください。',
   matching:'私は静岡県島田市で荒茶の斡旋業を営んでいます。取引先の生産家は平均年齢65歳を超えており、後継者不在が深刻な問題です。以下の点について、最新情報をウェブ検索で調べて日本語で詳しく教えてください。\n\n①静岡県・鹿児島県で茶農家の後継者を探している事例や支援制度\n②茶農業・茶農家を継ぎたい新規就農者向けのマッチングサービスや募集情報\n③農林水産省や各県の就農支援・補助金制度で茶業に活用できるもの\n④茶農家の担い手不足に対する先進的な取組み事例\n⑤農業継承マッチングサービスの中で茶業に使えるもの\n\n生産家に情報提供したり、後継者候補との橋渡しをするための実務的な情報をお願いします。'
 };
 
@@ -5727,50 +5839,6 @@ function _fmtDiff(d,pct){
   var arrow=same?'→':up?'▲':'▼';
   return '<b style="color:'+col+';">'+arrow+' '+(d>0?'+':'')+Math.round(d).toLocaleString()+'円（'+(pct>0?'+':'')+pct.toFixed(1)+'%）</b>';
 }
-function priceAdvisor(){
-  var el=document.getElementById('price-advisor'); if(!el) return;
-  var pid=parseInt((document.getElementById('t-producer')||{value:''}).value);
-  if(!pid){ el.innerHTML=''; return; }
-  var pObj=partners.find(function(x){return x.id===pid;});
-  if(pObj && pObj.type!=='producer'){ el.innerHTML=''; return; } // 茶商仕入れは対象外
-  var date=(document.getElementById('t-date')||{value:''}).value||new Date().toISOString().split('T')[0];
-  var sn=seasonForDate(date);
-  var pool=trades.filter(function(t){return t.producerId===pid && (!sn||t.season===sn);})
-    .slice().sort(function(a,b){return a.date.localeCompare(b.date)||a.id-b.id;});
-  if(!pool.length){ el.innerHTML='<div style="font-size:11px;color:var(--hint);margin:-6px 0 14px;">この生産家の今茶期の出荷はまだありません（初回）</div>'; return; }
-  var q=pool.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
-  var cnt=pool.length;
-  var last=pool[pool.length-1];
-  var lastDate=last.date;
-  var daysSince=Math.floor((new Date(date+'T00:00:00')-new Date(lastDate+'T00:00:00'))/86400000);
-  // 平均出荷間隔
-  var gaps=[]; for(var i=1;i<pool.length;i++){ var g=Math.floor((new Date(pool[i].date+'T00:00:00')-new Date(pool[i-1].date+'T00:00:00'))/86400000); if(g>0) gaps.push(g); }
-  var avgGap=gaps.length?Math.round(gaps.reduce(function(a,b){return a+b;},0)/gaps.length):null;
-  // 前茶期の最終累計（去年の同じ茶期）と比較で残量目安
-  var lastQtyPerShip=q/cnt;
-  // ステータス判定
-  var status, scol, sbg, advice;
-  if(avgGap!=null && daysSince > avgGap*1.6){
-    status='⚠️ 出荷ペース鈍化'; scol='#c0392b'; sbg='var(--red-light)';
-    advice='前回から'+daysSince+'日（平均'+avgGap+'日間隔）。そろそろ次が出るか要確認。';
-  } else if(avgGap!=null && daysSince>=avgGap*0.7){
-    status='🟢 そろそろ出荷タイミング'; scol='#2e7d32'; sbg='var(--matcha-light)';
-    advice='平均'+avgGap+'日間隔。前回から'+daysSince+'日なので次が近いかも。';
-  } else {
-    status='🟢 出荷中（活発）'; scol='#2e7d32'; sbg='var(--matcha-light)';
-    advice='直近'+daysSince+'日前に出荷。まだ動いています。';
-  }
-  var h='<div style="background:'+sbg+';border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin:-6px 0 16px;">';
-  h+='<div style="font-size:12px;font-weight:700;color:'+scol+';margin-bottom:6px;">'+status+'</div>';
-  h+='<div style="display:flex;gap:8px;text-align:center;margin-bottom:8px;">'
-    +'<div style="flex:1;"><div style="font-size:9px;color:var(--hint);font-weight:700;">今茶期 出荷</div><div style="font-size:14px;font-weight:800;color:var(--matcha);">'+cnt+'回 / '+(q>=1000?(q/1000).toFixed(1)+'t':Math.round(q)+'kg')+'</div></div>'
-    +'<div style="flex:1;"><div style="font-size:9px;color:var(--hint);font-weight:700;">前回から</div><div style="font-size:14px;font-weight:800;">'+daysSince+'日</div></div>'
-    +'<div style="flex:1;"><div style="font-size:9px;color:var(--hint);font-weight:700;">平均間隔</div><div style="font-size:14px;font-weight:800;">'+(avgGap!=null?avgGap+'日':'—')+'</div></div>'
-    +'</div>';
-  h+='<div style="font-size:11px;color:var(--ink2);line-height:1.6;">💡 '+advice+'</div>';
-  h+='</div>';
-  el.innerHTML=h;
-}
 function liveCalc(){
   var el=document.getElementById('live-calc'); if(!el) return;
   var price=parseFloat((document.getElementById('t-price')||{value:''}).value)||0;
@@ -5876,77 +5944,64 @@ function shareDayImage(date){
 }
 
 
-/* ===== 出荷ペース＆残量ボード ===== */
-function buildPaceBoard(){
-  var today=new Date(); var todayStr=today.toISOString().split('T')[0];
-  var sn=(analyzeSeason&&analyzeSeason!=='all')?analyzeSeason:seasonForDate(todayStr);
-  var producers=partners.filter(function(p){return p.type==='producer';});
-  var rows=producers.map(function(p){
-    var pool=trades.filter(function(t){return t.producerId===p.id && (!sn||t.season===sn) && (analyzeYear?t.date.slice(0,4)===analyzeYear:true);})
-      .slice().sort(function(a,b){return a.date.localeCompare(b.date)||a.id-b.id;});
-    if(!pool.length) return {p:p,active:false};
-    var qty=pool.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
-    var last=pool[pool.length-1];
-    var daysSince=Math.floor((today-new Date(last.date+'T00:00:00'))/86400000);
-    var gaps=[]; for(var i=1;i<pool.length;i++){var g=Math.floor((new Date(pool[i].date+'T00:00:00')-new Date(pool[i-1].date+'T00:00:00'))/86400000);if(g>0)gaps.push(g);}
-    var avgGap=gaps.length?Math.round(gaps.reduce(function(a,b){return a+b;},0)/gaps.length):null;
-    var prevYear=String(parseInt((pool[0].date||todayStr).slice(0,4))-1);
-    var prevPool=trades.filter(function(t){return t.producerId===p.id && t.season===sn && t.date.slice(0,4)===prevYear;});
-    var prevQty=prevPool.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
-    var remainEst=prevQty>0?Math.max(0,Math.round(prevQty-qty)):null;
-    var state;
-    if(avgGap==null){ state=daysSince<=5?0:1; }
-    else if(daysSince>avgGap*2.2){ state=3; }
-    else if(daysSince>avgGap*1.6){ state=2; }
-    else if(daysSince>=avgGap*0.7){ state=1; }
-    else { state=0; }
-    return {p:p,cnt:pool.length,qty:qty,last:last.date,daysSince:daysSince,avgGap:avgGap,prevQty:prevQty,remainEst:remainEst,active:true,state:state};
-  }).filter(function(r){return r.active;});
 
-  rows.sort(function(a,b){
-    if(a.state!==b.state) return a.state-b.state;
-    var ar=a.remainEst!=null?a.remainEst:-1, br=b.remainEst!=null?b.remainEst:-1;
-    return br-ar;
-  });
 
-  var STATE=[
-    {t:'🟢 出荷中',c:'#2e7d32',bg:'var(--matcha-light)'},
-    {t:'🟡 そろそろ',c:'#b8860b',bg:'var(--gold-light)'},
-    {t:'🟠 ペース鈍化',c:'#c0392b',bg:'var(--red-light)'},
-    {t:'🔴 途絶え気味',c:'#8a2a2a',bg:'var(--red-light)'}
-  ];
+/* ===== 「○○さん今茶期サマリー」即答カード ===== */
+function buildPartnerSummaryCard(p, myTrades){
+  var today=new Date().toISOString().split('T')[0];
+  var sn=seasonForDate(today)||(getSeasonDefs().slice().sort(function(a,b){return String(b.startDate).localeCompare(String(a.startDate));})[0]||{}).name;
+  if(!sn) return '';
+  var isProducer=p.type==='producer';
+  // 今茶期の取引（この相手が関与）
+  var cur=myTrades.filter(function(t){return t.season===sn;});
+  if(!cur.length){
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--matcha);border-radius:12px;padding:13px 15px;margin-bottom:16px;box-shadow:var(--shadow-sm);">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--matcha);margin-bottom:4px;">📌 '+sn+'サマリー</div>'
+      +'<div style="font-size:12px;color:var(--hint);">今茶期の取引はまだありません</div></div>';
+  }
+  var q=cur.reduce(function(x,t){return x+(t.totalQty||0);},0);
+  var amt=cur.reduce(function(x,t){return x+tradeAmount(t);},0);
+  var avg=q>0?Math.round(amt/q):0;
+  var dates=cur.map(function(t){return t.date;}).sort();
+  var firstD=dates[0], lastD=dates[dates.length-1];
+  var daysSinceLast=Math.floor((new Date(today+'T00:00:00')-new Date(lastD+'T00:00:00'))/86400000);
+  // 単価レンジ（lot単位）
+  var prices=[]; cur.forEach(function(t){ (t.lots||[]).forEach(function(l){ var pr=lotPrice(t,l); if(pr>0) prices.push(pr); }); });
+  var pmin=prices.length?Math.min.apply(null,prices):0, pmax=prices.length?Math.max.apply(null,prices):0;
+  // 品種別の数量内訳（上位3）
+  var byVar={}; cur.forEach(function(t){ var v=t.variety||'（無記入）'; byVar[v]=(byVar[v]||0)+(t.totalQty||0); });
+  var varTop=Object.keys(byVar).map(function(v){return {v:v,q:byVar[v]};}).sort(function(a,b){return b.q-a.q;}).slice(0,3);
+  // 相手内訳（生産家なら売先、茶商なら仕入元）
+  var partnerLabel=isProducer?'主な売先':'主な仕入元';
+  var byP={}; cur.forEach(function(t){ var oid=isProducer?t.buyerId:t.producerId; var op=partners.find(function(x){return x.id===oid;}); var nm=op?op.name:'—'; byP[nm]=(byP[nm]||0)+(t.totalQty||0); });
+  var pTop=Object.keys(byP).map(function(n){return {n:n,q:byP[n]};}).sort(function(a,b){return b.q-a.q;}).slice(0,3);
+  // 関連メモ（名前を含むメモ）
+  loadMemos();
+  var nameKey=docCanonName? p.name : p.name;
+  var relMemos=allMemos.filter(function(m){ return (m.body||'').indexOf(p.name)>=0 || ((m.body||'').indexOf(p.name.replace(/[（(].*$/,''))>=0 && p.name.replace(/[（(].*$/,'').length>=2); }).slice(0,3);
 
-  var h='<div class="section-label">🚚 出荷ペース＆残量ボード'+(sn?'（'+sn+'）':'')+'</div>';
-  h+='<div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:12px;padding:10px 13px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">「誰がまだ出荷中で、あとどれくらい出そうか」を一覧化。<b>残量目安</b>は<b>昨年同茶期の総量−今茶期実績</b>。出荷間隔から次回タイミングも判定します。</div>';
+  function fq(n){ return n>=1000?(n/1000).toFixed(1)+'t':Math.round(n)+'kg'; }
 
-  if(!rows.length){ return h+'<div class="empty-state"><span class="empty-ico">🚚</span>この茶期の出荷データがありません</div>'; }
-
-  var stillActive=rows.filter(function(r){return r.state<=1;}).length;
-  var totalRemain=rows.reduce(function(s2,r){return s2+(r.remainEst||0);},0);
-  h+='<div style="display:flex;gap:8px;margin-bottom:14px;">'
-    +'<div style="flex:1;background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:12px;padding:11px 8px;text-align:center;"><div style="font-size:9px;color:var(--matcha);font-weight:700;">まだ動いてる</div><div style="font-size:18px;font-weight:800;color:var(--matcha);">'+stillActive+'<span style="font-size:11px;">軒</span></div></div>'
-    +'<div style="flex:1;background:var(--gold-light);border:1px solid var(--gold-mid);border-radius:12px;padding:11px 8px;text-align:center;"><div style="font-size:9px;color:var(--gold);font-weight:700;">残量目安 合計</div><div style="font-size:18px;font-weight:800;color:var(--gold);">'+(totalRemain>=1000?(totalRemain/1000).toFixed(1)+'t':totalRemain.toLocaleString()+'kg')+'</div></div>'
+  var h='<div style="background:linear-gradient(135deg,var(--matcha-light),var(--surface));border:1px solid var(--matcha-mid);border-radius:14px;padding:15px;margin-bottom:16px;box-shadow:var(--shadow-sm);">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:13px;font-weight:800;color:var(--matcha);">📌 '+sn+'サマリー（即答用）</span>'
+    +'<span style="font-size:10px;color:var(--hint);">'+daysSinceLast+'日前に最終取引</span></div>';
+  // 主要数値
+  h+='<div style="display:flex;gap:8px;text-align:center;margin-bottom:10px;">'
+    +'<div style="flex:1;"><div style="font-size:9px;color:var(--hint);font-weight:700;">'+(isProducer?'出荷':'取引')+'回数</div><div style="font-size:15px;font-weight:800;color:var(--ink);">'+cur.length+'回</div></div>'
+    +'<div style="flex:1.2;"><div style="font-size:9px;color:var(--hint);font-weight:700;">数量</div><div style="font-size:15px;font-weight:800;color:var(--matcha);">'+fq(q)+'</div></div>'
+    +'<div style="flex:1.2;"><div style="font-size:9px;color:var(--hint);font-weight:700;">平均単価</div><div style="font-size:15px;font-weight:800;color:var(--ink);">'+avg.toLocaleString()+'円</div></div>'
     +'</div>';
-
-  h+='<div class="card" style="padding:0;overflow:hidden;">';
-  rows.forEach(function(r){
-    var st=STATE[r.state];
-    h+='<div onclick="showPartnerDetail('+r.p.id+')" style="padding:12px 14px;border-bottom:1px solid var(--paper2);cursor:pointer;">';
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-      +'<span style="font-size:14px;font-weight:700;color:var(--ink);">'+r.p.name+'</span>'
-      +'<span style="font-size:10px;font-weight:700;color:'+st.c+';background:'+st.bg+';padding:3px 9px;border-radius:10px;white-space:nowrap;">'+st.t+'</span></div>';
-    h+='<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">'
-      +'<span>今茶期 <b style="color:var(--ink2);">'+(r.qty>=1000?(r.qty/1000).toFixed(1)+'t':Math.round(r.qty)+'kg')+'</b>（'+r.cnt+'回）</span>'
-      +'<span>前回 '+r.daysSince+'日前'+(r.avgGap!=null?'・平均'+r.avgGap+'日':'')+'</span></div>';
-    if(r.remainEst!=null && r.prevQty>0){
-      var pct=Math.min(100,Math.round(r.qty/r.prevQty*100));
-      h+='<div style="margin-top:7px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--hint);margin-bottom:3px;"><span>昨年比の進捗</span><span>残り目安 <b style="color:var(--gold);">'+(r.remainEst>=1000?(r.remainEst/1000).toFixed(1)+'t':r.remainEst.toLocaleString()+'kg')+'</b>（昨年 '+(r.prevQty>=1000?(r.prevQty/1000).toFixed(1)+'t':Math.round(r.prevQty)+'kg')+'）</span></div>'
-        +'<div style="height:6px;background:var(--paper2);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(pct>=100?'var(--matcha)':'linear-gradient(to right,var(--matcha),var(--gold))')+';"></div></div></div>';
-    } else {
-      h+='<div style="font-size:10px;color:var(--hint);margin-top:5px;">昨年の同茶期データがないため残量目安は表示できません</div>';
-    }
+  h+='<div style="font-size:11px;color:var(--ink2);line-height:1.8;border-top:1px solid var(--matcha-mid);padding-top:9px;">';
+  h+='・期間：'+firstD.slice(5).replace('-','/')+' 〜 '+lastD.slice(5).replace('-','/')+'<br>';
+  if(prices.length) h+='・単価帯：'+pmin.toLocaleString()+'〜'+pmax.toLocaleString()+'円<br>';
+  if(varTop.length && varTop[0].v!=='（無記入）') h+='・品種：'+varTop.map(function(x){return x.v+'('+fq(x.q)+')';}).join('、')+'<br>';
+  h+='・'+partnerLabel+'：'+pTop.map(function(x){return x.n+'('+fq(x.q)+')';}).join('、');
+  h+='</div>';
+  if(relMemos.length){
+    h+='<div style="margin-top:10px;border-top:1px solid var(--matcha-mid);padding-top:9px;"><div style="font-size:10px;color:var(--hint);font-weight:700;margin-bottom:4px;">🔎 関連メモ</div>';
+    h+=relMemos.map(function(m){ return '<div style="font-size:11px;color:var(--ink2);line-height:1.5;margin-bottom:3px;">・<span style="color:var(--hint);">'+(m.date||'')+'</span> '+escText((m.body||'').slice(0,40))+((m.body||'').length>40?'…':'')+'</div>'; }).join('');
     h+='</div>';
-  });
+  }
   h+='</div>';
   return h;
 }
