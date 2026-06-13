@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-L</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-M</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1565,7 +1565,7 @@ function showScreen(name){
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
   if(name==='order') renderOrder();
-  if(name==='market') initMarketPreviews();
+  if(name==='market'){ initMarketPreviews(); try{ renderSoubaBoard(); }catch(e){} }
   if(name==='settings'){ notionLoadSettings(); gsLoadSettings(); renderThemeButtons();
     try{ var lb=_safeLS.getItem('ocha_last_backup'); var bi=document.getElementById('settings-backup-info'); if(bi) bi.textContent=lb?('最終バックアップ：'+lb):'バックアップはまだ取得されていません'; }catch(e){}
   }
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-L</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-M</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
