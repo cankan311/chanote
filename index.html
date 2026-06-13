@@ -628,10 +628,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
   <!-- 取引記録フォーム -->
   <div class="card">
     <div class="field-group"><label>📅 取引日</label><input type="date" id="t-date"></div>
-    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>🏪 売先</label><select id="t-buyer"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>品種</label><select id="t-variety"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview()"></div>
+    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="priceAdvisor();liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>🏪 売先</label><select id="t-buyer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>品種</label><select id="t-variety" onchange="priceAdvisor()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview();priceAdvisor();liveCalc()"></div>
+    <div id="price-advisor"></div>
     <div class="section-label" style="margin-top:4px;">荷口・数量</div>
     <div id="lot-list"></div>
     <button class="add-lot-btn" onclick="addLot()">＋ 荷口を追加する</button>
@@ -639,6 +640,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       <span class="grand-total-label">合計数量</span>
       <span class="grand-total-val" id="grand-total">— kg</span>
     </div>
+    <div id="live-calc"></div>
     <div class="section-label">成分分析数値</div>
     <div class="comp-row" id="component-inputs"></div>
     <div class="field-group" style="margin-top:16px;">
@@ -819,8 +821,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       そのままClaudeのチャット画面に貼り付けて送信してください。
     </div>
   </div>
-
-  <button onclick="quickMarketMemo()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;margin-bottom:16px;border-radius:14px;border:1.5px solid var(--gold-mid);background:var(--gold-light);color:var(--gold);font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">📝 今日の相場・茶況をメモする</button>
 
   <!-- コピー済みトースト表示エリア -->
   <div id="market-copy-toast" style="display:none;background:var(--matcha);color:#fff;border-radius:var(--radius-sm);padding:12px 16px;text-align:center;font-size:13px;font-weight:700;margin-bottom:12px;">
@@ -1057,7 +1057,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.15-F</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.15-G</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1160,7 +1160,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
           <button id="memo-rec-btn" onclick="toggleMemoRecording()" style="padding:8px 14px;font-size:12px;font-weight:700;border-radius:8px;border:1.5px solid #e06c6c;background:transparent;color:#e06c6c;cursor:pointer;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:5px;">🎤 録音して文字起こし</button>
           <div id="memo-rec-status" style="font-size:11px;color:var(--muted);display:flex;align-items:center;"></div>
         </div>
-        <textarea id="memo-body" placeholder="メモを入力（録音ボタンで音声入力も可）..." style="width:100%;padding:12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;height:120px;resize:vertical;line-height:1.7;"></textarea>
+        <div style="position:relative;"><textarea id="memo-body" placeholder="メモを入力（録音ボタンで音声入力も可）..." style="width:100%;padding:12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;height:120px;resize:vertical;line-height:1.7;"></textarea><button id="memo-mic" onclick="toggleVoiceMemo()" style="position:absolute;right:8px;bottom:10px;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--matcha-mid);background:var(--surface);font-size:18px;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;">🎤</button></div>
       </div>
       <div style="margin-bottom:14px;">
         <label style="font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:6px;">添付（写真・画像・ファイル）</label>
@@ -1681,7 +1681,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.15-F</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.15-G</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2757,6 +2757,7 @@ function updateGrandTotal(){
   document.querySelectorAll('[id^="lot-qty-"]').forEach(function(inp){total+=parseFloat(inp.value)||0;});
   var el=document.getElementById('grand-total');
   if(el) el.textContent=total>0?fmt(total)+' kg':'— kg';
+  liveCalc();
 }
 function collectLots(){
   var lots=[];
@@ -2990,7 +2991,7 @@ function showTradeDetail(id){
   var compRows=Object.entries(t.components||{}).filter(function(e){return e[1]!==undefined&&!isNaN(e[1]);}).map(function(e){return '<div class="drow"><span class="dkey">'+e[0]+'</span><span class="dval">'+e[1]+'</span></div>';}).join('');
   var html='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
   html+='<div style="font-size:18px;font-weight:700;">📋 取引詳細</div>';
-  html+='<button onclick="editTrade('+t.id+')" style="padding:8px 16px;font-size:13px;border-radius:20px;background:var(--matcha);color:#fff;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;box-shadow:0 2px 8px rgba(58,107,69,0.25);">✏️ 編集</button>';
+  html+='<div style="display:flex;gap:8px;"><button onclick="shareTradeImage('+t.id+')" style="padding:8px 14px;font-size:13px;border-radius:20px;background:var(--surface);color:var(--matcha);border:1.5px solid var(--matcha-mid);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;">📤 共有</button><button onclick="editTrade('+t.id+')" style="padding:8px 16px;font-size:13px;border-radius:20px;background:var(--matcha);color:#fff;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:700;box-shadow:0 2px 8px rgba(58,107,69,0.25);">✏️ 編集</button></div>';
   html+='</div>';
   html+='<div class="detail-box"><div class="drow"><span class="dkey">取引日</span><span class="dval">'+t.date+'</span></div><div class="drow"><span class="dkey">茶期</span><span class="dval">'+(t.season||'—')+'</span></div><div class="drow"><span class="dkey">🌿 生産家</span><span class="dval">'+(prod?prod.name:'—')+'</span></div><div class="drow"><span class="dkey">🏪 売先</span><span class="dval">'+(buy?buy.name:'—')+'</span></div><div class="drow"><span class="dkey">品種</span><span class="dval">'+(t.variety||'—')+'</span></div><div class="drow"><span class="dkey">合計数量</span><span class="dval" style="color:var(--matcha);font-size:15px;">'+fmt(t.totalQty||0)+' kg</span></div><div class="drow"><span class="dkey">売値</span><span class="dval">'+t.price.toLocaleString()+' 円/kg</span></div>'+kobikiRow+'<div class="drow"><span class="dkey" style="font-weight:700;">合計金額</span><span class="dval" style="font-size:16px;color:var(--matcha);font-weight:700;">'+totalAmt.toLocaleString(undefined,{maximumFractionDigits:0})+' 円</span></div></div>';
   html+='<div class="section-label">荷口明細</div>'+lotRows;
@@ -3122,7 +3123,7 @@ function updateKobikiPreview(){
     prev.innerHTML='粉引き後の実勢単価：<span style="font-weight:700;color:var(--gold);">'+netPrice.toLocaleString()+' 円/kg</span> <span style="color:var(--hint);">('+price.toLocaleString()+'円 × '+(100-pct)+'%)</span>';
   } else {
     prev.innerHTML='<span style="color:var(--hint);">売値を入力すると粉引き後単価が表示されます</span>';
-  }
+  }  try{liveCalc();}catch(e){}
 }
 
 
@@ -4970,17 +4971,6 @@ function renderDayMemos(date){
   }).join('');
   return h;
 }
-function quickMarketMemo(){
-  openMemoModal();
-  var today=new Date().toISOString().split('T')[0];
-  var dt=document.getElementById('memo-date'); if(dt) dt.value=today;
-  document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
-    if(btn.dataset.tag==='相場'){
-      btn.dataset.active='1';
-      btn.style.background='#ff9800'; btn.style.color='#fff'; btn.style.borderColor='#ff9800';
-    }
-  });
-}
 function memoForDate(date){
   openMemoModal();
   var dt=document.getElementById('memo-date'); if(dt) dt.value=date;
@@ -5693,6 +5683,160 @@ function renderHome(){
     var we=document.getElementById('home-weather');
     if(w&&we) we.innerHTML='<span style="font-size:22px;">'+w.icon+'</span><div>'+(w.tMax!=null&&w.tMax!=='—'?'<span style="color:#e06c6c;font-weight:700;">'+Math.round(w.tMax)+'°</span> / <span style="color:#2980b9;">'+Math.round(w.tMin)+'°</span>':'')+(w.jmaPop!=null?'　☔'+w.jmaPop+'%':'')+'</div>';
   }).catch(function(){});
+}
+
+
+/* ===== 値決めナビ＆手取りライブ計算 ===== */
+function _fmtDiff(d,pct){
+  var up=d>0, same=Math.abs(d)<1;
+  var col=same?'var(--muted)':up?'#2e7d32':'#c0392b';
+  var arrow=same?'→':up?'▲':'▼';
+  return '<b style="color:'+col+';">'+arrow+' '+(d>0?'+':'')+Math.round(d).toLocaleString()+'円（'+(pct>0?'+':'')+pct.toFixed(1)+'%）</b>';
+}
+function priceAdvisor(){
+  var el=document.getElementById('price-advisor'); if(!el) return;
+  var pid=parseInt((document.getElementById('t-producer')||{value:''}).value);
+  var vari=(document.getElementById('t-variety')||{value:''}).value;
+  var price=parseFloat((document.getElementById('t-price')||{value:''}).value);
+  if(!pid){ el.innerHTML=''; return; }
+  var date=(document.getElementById('t-date')||{value:''}).value||new Date().toISOString().split('T')[0];
+  var sn=seasonForDate(date);
+  // 対象：この生産家・今茶期（品種一致を優先、無ければ全品種）
+  var base=trades.filter(function(t){return t.producerId===pid && (!sn||t.season===sn);});
+  var pool=vari?base.filter(function(t){return t.variety===vari;}):base;
+  if(!pool.length) pool=base;
+  if(!pool.length){ el.innerHTML='<div style="font-size:11px;color:var(--hint);margin:-6px 0 14px;">この生産家の今茶期のデータはまだありません</div>'; return; }
+  pool=pool.slice().sort(function(a,b){return a.date.localeCompare(b.date)||a.id-b.id;});
+  var last=pool[pool.length-1];
+  var q=0,a=0; pool.forEach(function(t){q+=(t.totalQty||0);a+=tradeAmount(t);});
+  var avg=q>0?a/q:0;
+  // 全生産家・同品種の茶期平均
+  var allPool=trades.filter(function(t){return (!sn||t.season===sn)&&(!vari||t.variety===vari);});
+  var aq=0,aa=0; allPool.forEach(function(t){aq+=(t.totalQty||0);aa+=tradeAmount(t);});
+  var allAvg=aq>0?aa/aq:0;
+  // スパークライン（直近10件の単価）
+  var pts=pool.slice(-10).map(function(t){return (t.totalQty||0)>0?tradeAmount(t)/(t.totalQty||1):t.price;});
+  var spark='';
+  if(pts.length>=2){
+    var mn=Math.min.apply(null,pts), mx=Math.max.apply(null,pts), rg=(mx-mn)||1;
+    var W=110,H=26;
+    var pl=pts.map(function(v,i){return Math.round(i*(W/(pts.length-1)))+','+Math.round(H-3-((v-mn)/rg)*(H-6));}).join(' ');
+    spark='<svg width="'+W+'" height="'+H+'" style="display:block;"><polyline points="'+pl+'" fill="none" stroke="var(--matcha)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="'+pl.split(' ').pop().split(',')[0]+'" cy="'+pl.split(' ').pop().split(',')[1]+'" r="3" fill="var(--gold)"/></svg>';
+  }
+  var h='<div style="background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:12px;padding:11px 13px;margin:-6px 0 16px;">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+  h+='<div style="font-size:11px;color:var(--ink2);line-height:1.9;">'
+    +'<div>📊 <b>値決めナビ</b>'+(sn?'（'+sn+(vari?'・'+vari:'')+'）':'')+'</div>'
+    +'<div>前回 <b>'+Math.round((last.totalQty||0)>0?tradeAmount(last)/(last.totalQty||1):last.price).toLocaleString()+'円</b>'
+    +'<span style="color:var(--hint);font-size:10px;">（'+last.date.slice(5).replace('-','/')+'）</span>'
+    +'　平均 <b>'+Math.round(avg).toLocaleString()+'円</b>'
+    +(allAvg>0?'　全体 <b>'+Math.round(allAvg).toLocaleString()+'円</b>':'')+'</div></div>';
+  h+='<div>'+spark+'</div></div>';
+  if(price>0&&avg>0){
+    var d=price-avg, pct=d/avg*100;
+    h+='<div style="font-size:12px;margin-top:7px;padding-top:7px;border-top:1px solid var(--matcha-mid);">この値段は平均比 '+_fmtDiff(d,pct);
+    if(Math.abs(pct)>=30) h+='　<span style="color:#c0392b;font-weight:700;">⚠️ 桁の入力ミスはありませんか？</span>';
+    h+='</div>';
+  }
+  h+='</div>';
+  el.innerHTML=h;
+}
+function liveCalc(){
+  var el=document.getElementById('live-calc'); if(!el) return;
+  var price=parseFloat((document.getElementById('t-price')||{value:''}).value)||0;
+  var pid=parseInt((document.getElementById('t-producer')||{value:''}).value);
+  var bid=parseInt((document.getElementById('t-buyer')||{value:''}).value);
+  var lots=collectLots();
+  var amt=0,qty=0;
+  lots.forEach(function(l){ qty+=(l.qty||0); amt+=(l.qty||0)*((l.price&&l.price>0)?l.price:price); });
+  if(!(qty>0&&(price>0||amt>0))){ el.innerHTML=''; return; }
+  var rate=(pid&&bid)?getFeeRate(pid,bid):FEE_RATE_HIGH;
+  var fee=Math.round(amt*rate);
+  el.innerHTML='<div style="display:flex;gap:7px;margin:10px 0 4px;">'
+    +'<div style="flex:1.2;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center;"><div style="font-size:9px;color:var(--hint);font-weight:700;">合計金額</div><div style="font-size:14px;font-weight:800;color:var(--matcha);">'+Math.round(amt).toLocaleString()+'円</div></div>'
+    +'<div style="flex:1;background:var(--gold-light);border:1px solid var(--gold-mid);border-radius:10px;padding:8px 6px;text-align:center;"><div style="font-size:9px;color:var(--gold);font-weight:700;">口銭 '+(rate*100).toFixed(1)+'%</div><div style="font-size:14px;font-weight:800;color:var(--gold);">'+fee.toLocaleString()+'円</div></div>'
+    +'<div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center;"><div style="font-size:9px;color:var(--hint);font-weight:700;">平均単価</div><div style="font-size:14px;font-weight:800;">'+(qty>0?Math.round(amt/qty).toLocaleString():'—')+'円</div></div>'
+    +'</div>';
+}
+
+
+/* ===== 音声メモ（Web Speech API） ===== */
+var _rec=null,_recOn=false;
+function toggleVoiceMemo(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  var btn=document.getElementById('memo-mic');
+  if(!SR){ alert('この端末のブラウザは音声入力に対応していません。Chromeでお試しください。'); return; }
+  if(_recOn){ try{_rec.stop();}catch(e){} return; }
+  _rec=new SR();
+  _rec.lang='ja-JP'; _rec.continuous=true; _rec.interimResults=false;
+  _rec.onstart=function(){ _recOn=true; if(btn){btn.style.background='#ff9800';btn.style.borderColor='#ff9800';btn.textContent='⏹';} if(navigator.vibrate)navigator.vibrate(10); };
+  _rec.onresult=function(ev){
+    var txt='';
+    for(var i=ev.resultIndex;i<ev.results.length;i++){ if(ev.results[i].isFinal) txt+=ev.results[i][0].transcript; }
+    if(txt){ var b=document.getElementById('memo-body'); if(b) b.value=(b.value?b.value+'\n':'')+txt.trim(); }
+  };
+  _rec.onerror=function(ev){ if(ev.error==='not-allowed') alert('マイクの使用が許可されていません。ブラウザの設定でマイクを許可してください。'); };
+  _rec.onend=function(){ _recOn=false; if(btn){btn.style.background='var(--surface)';btn.style.borderColor='var(--matcha-mid)';btn.textContent='🎤';} };
+  try{ _rec.start(); }catch(e){}
+}
+
+/* ===== 取引票を画像で共有 ===== */
+function shareTradeImage(id){
+  var t=trades.find(function(x){return x.id===id;}); if(!t) return;
+  var prod=partners.find(function(p){return p.id===t.producerId;});
+  var buy=partners.find(function(p){return p.id===t.buyerId;});
+  var lots=(t.lots||[]);
+  var W=720, rowH=46, headH=210, footH=170;
+  var H=headH+Math.max(1,lots.length)*rowH+footH;
+  var c=document.createElement('canvas'); c.width=W; c.height=H;
+  var x=c.getContext('2d');
+  x.fillStyle='#faf7f2'; x.fillRect(0,0,W,H);
+  x.fillStyle='#3a6b45'; x.fillRect(0,0,W,86);
+  x.fillStyle='#fff'; x.font='700 30px "Noto Sans JP",sans-serif';
+  x.fillText('茶帳　取引票',28,54);
+  x.font='400 20px "Noto Sans JP",sans-serif'; x.textAlign='right';
+  x.fillText(t.date+(t.season?'　'+t.season:''),W-28,54); x.textAlign='left';
+  x.fillStyle='#1a1714'; x.font='700 26px "Noto Sans JP",sans-serif';
+  x.fillText('🌿 '+(prod?prod.name:'—')+'　→　🏪 '+(buy?buy.name:'—'),28,132);
+  x.fillStyle='#7a7068'; x.font='400 20px "Noto Sans JP",sans-serif';
+  x.fillText('品種：'+(t.variety||'—')+'　　売値：'+t.price.toLocaleString()+'円/kg'+(t.kobiki?'　　粉引き'+t.kobiki+'%':''),28,168);
+  var y=headH;
+  x.fillStyle='#f2ede4'; x.fillRect(0,y-30,W,34);
+  x.fillStyle='#7a7068'; x.font='700 17px "Noto Sans JP",sans-serif';
+  x.fillText('荷印',28,y-6); x.textAlign='right';
+  x.fillText('数量',W-330,y-6); x.fillText('単価',W-180,y-6); x.fillText('金額',W-28,y-6); x.textAlign='left';
+  x.font='400 20px "Noto Sans JP",sans-serif';
+  lots.forEach(function(l,i){
+    var yy=y+24+i*rowH;
+    x.fillStyle=i%2?'#f6f2ea':'#faf7f2'; x.fillRect(0,yy-26,W,rowH);
+    x.fillStyle='#1a1714';
+    x.fillText(l.mark||('荷口'+(i+1)),28,yy);
+    x.textAlign='right';
+    x.fillText(fmt(l.qty)+' kg',W-330,yy);
+    x.fillText(lotPrice(t,l).toLocaleString()+'円',W-180,yy);
+    x.fillText(Math.round((l.qty||0)*lotPrice(t,l)).toLocaleString()+'円',W-28,yy);
+    x.textAlign='left';
+  });
+  var fy=y+Math.max(1,lots.length)*rowH+34;
+  x.strokeStyle='#d0c8bc'; x.beginPath(); x.moveTo(28,fy-22); x.lineTo(W-28,fy-22); x.stroke();
+  x.fillStyle='#1a1714'; x.font='700 24px "Noto Sans JP",sans-serif';
+  x.fillText('合計　'+fmt(t.totalQty||0)+' kg',28,fy+10);
+  x.fillStyle='#3a6b45'; x.font='800 32px "Noto Sans JP",sans-serif'; x.textAlign='right';
+  x.fillText(Math.round(tradeAmount(t)).toLocaleString()+' 円',W-28,fy+12); x.textAlign='left';
+  x.fillStyle='#b0a898'; x.font='400 15px "Noto Sans JP",sans-serif';
+  x.fillText('茶帳 — '+new Date().toLocaleString('ja-JP'),28,H-24);
+  c.toBlob(function(blob){
+    if(!blob) return;
+    var file=new File([blob],'torihiki_'+t.date+'.png',{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:'取引票 '+t.date}).catch(function(){});
+    } else {
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download='torihiki_'+t.date+'.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      toast('画像を保存しました');
+    }
+  },'image/png');
 }
 
 load();
