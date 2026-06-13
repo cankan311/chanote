@@ -515,6 +515,20 @@ body{
   box-shadow:0 2px 8px rgba(58,107,69,0.25);
 }
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+/* ===== UIポリッシュ ===== */
+*{-webkit-tap-highlight-color:transparent;}
+html{scroll-behavior:smooth;}
+button{transition:transform .12s ease, opacity .12s ease, background .15s ease;}
+button:active{transform:scale(0.96);}
+.trade-card,.partner-card,.stat-card,.card{transition:transform .12s ease, box-shadow .15s ease;}
+.trade-card:active,.partner-card:active{transform:scale(0.985);}
+@keyframes screenIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.screen.active{animation:screenIn .18s ease;}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px);}to{opacity:1;transform:translate(-50%,0);}}
+#gantt-scroll{scroll-behavior:smooth;}
+input,select,textarea{transition:border-color .15s ease, box-shadow .15s ease;}
+input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !important;box-shadow:0 0 0 3px rgba(58,107,69,0.08);}
 </style>
 
 
@@ -1005,7 +1019,7 @@ body{
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.13-C</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.14-D</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1598,7 +1612,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.13-C</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.14-D</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2197,9 +2211,9 @@ function renderGanttMonth(){
     var ds=ym+'-'+String(d).padStart(2,'0');
     var dow=new Date(ds).getDay();
     var isSun=dow===0,isSat=dow===6,isT=ds===today;
-    html+='<th onclick="showGanttWeather(\''+ds+'\')" style="padding:4px 2px;background:'+(isT?'var(--matcha-light)':isSun?'#ffeaea':isSat?'#eaf0ff':'var(--paper2)')+';border:1px solid var(--border);min-width:28px;text-align:center;cursor:pointer;color:'+(isT?'var(--matcha)':isSun?'#c0392b':isSat?'#2980b9':'var(--ink)')+';">'
-      +'<div style="font-size:10px;">'+d+'</div>'
-      +'<div style="font-size:8px;color:var(--hint);">'+['日','月','火','水','木','金','土'][dow]+'</div>'
+    html+='<th '+(isT?'id="gantt-today-col" ':'')+'onclick="showGanttWeather(\''+ds+'\')" style="padding:4px 2px;background:'+(isT?'var(--gold)':isSun?'#ffeaea':isSat?'#eaf0ff':'var(--paper2)')+';border:1px solid '+(isT?'var(--gold)':'var(--border)')+';min-width:28px;text-align:center;cursor:pointer;color:'+(isT?'#fff':isSun?'#c0392b':isSat?'#2980b9':'var(--ink)')+';'+(isT?'border-radius:6px 6px 0 0;':'')+'">'
+      +'<div style="font-size:10px;font-weight:'+(isT?'800':'600')+';">'+d+'</div>'
+      +'<div style="font-size:8px;color:'+(isT?'rgba(255,255,255,0.85)':'var(--hint)')+';">'+(isT?'今日':['日','月','火','水','木','金','土'][dow])+'</div>'
       +'</th>';
   }
   html+='</tr>';
@@ -2210,7 +2224,8 @@ function renderGanttMonth(){
   for(var d2=1;d2<=days;d2++){
     var ds2=ym+'-'+String(d2).padStart(2,'0');
     var w=weatherCache[ds2];
-    html+='<td onclick="showGanttWeather(\''+ds2+'\')" style="padding:2px 1px;border:1px solid var(--border);text-align:center;font-size:13px;cursor:pointer;min-width:28px;background:'+(w&&w.hasRain?'#eaf4ff':'')+';">'+(w?w.icon:'')+'</td>';
+    var _t2=ds2===today;
+    html+='<td onclick="showGanttWeather(\''+ds2+'\')" style="padding:2px 1px;border:1px solid '+(_t2?'var(--gold)':'var(--border)')+';border-top:1px solid var(--border);text-align:center;font-size:13px;cursor:pointer;min-width:28px;background:'+(w&&w.hasRain?'#eaf4ff':_t2?'rgba(200,155,60,0.10)':'')+';">'+(w?w.icon:'')+'</td>';
   }
   html+='</tr>';
 
@@ -2220,7 +2235,8 @@ function renderGanttMonth(){
   for(var d3=1;d3<=days;d3++){
     var ds3=ym+'-'+String(d3).padStart(2,'0');
     var wD=weatherCache[ds3];
-    html+='<td style="padding:1px;border:1px solid var(--border);text-align:center;font-size:8px;min-width:28px;line-height:1.3;">'
+    var _t3=ds3===today;
+    html+='<td style="padding:1px;border:1px solid '+(_t3?'var(--gold)':'var(--border)')+';border-top:1px solid var(--border);text-align:center;font-size:8px;min-width:28px;line-height:1.3;background:'+(_t3?'rgba(200,155,60,0.10)':'')+';">'
       +(wD&&wD.tMax!=null?'<div style="color:#e06c6c;font-weight:600;">'+Math.round(wD.tMax)+'°</div><div style="color:#2980b9;">'+Math.round(wD.tMin)+'°</div>':'')
       +'</td>';
   }
@@ -2240,14 +2256,21 @@ function renderGanttMonth(){
       var bg=effective==='active'?'#a8d8a8':effective==='rest'?'#f5a0a0':'';
       var icon=effective==='active'?'●':effective==='rest'?'×':'';
       var col=effective==='active'?'#2e7d32':effective==='rest'?'#c0392b':'var(--border)';
-      html+='<td onclick="cycleActivity(\''+ds4+'\','+p.id+')" style="padding:2px;border:1px solid var(--border);text-align:center;background:'+bg+';font-size:12px;font-weight:700;color:'+col+';min-width:28px;cursor:pointer;user-select:none;">'+icon+'</td>';
+      var _t4=ds4===today;
+      html+='<td onclick="cycleActivity(\''+ds4+'\','+p.id+')" style="padding:2px;border:1px solid '+(_t4?'var(--gold)':'var(--border)')+';border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;background:'+(bg||( _t4?'rgba(200,155,60,0.10)':''))+';font-size:12px;font-weight:700;color:'+col+';min-width:28px;cursor:pointer;user-select:none;">'+icon+'</td>';
     }
     html+='</tr>';
   });
   html+='</table></div>';
   el.innerHTML=html;
   var _sc=document.getElementById('gantt-scroll');
-  if(_sc&&_prevScroll) _sc.scrollLeft=_prevScroll;
+  if(_sc){
+    if(_prevScroll){ _sc.scrollLeft=_prevScroll; }
+    else {
+      var _tc=document.getElementById('gantt-today-col');
+      if(_tc) _sc.scrollLeft=Math.max(0,_tc.offsetLeft-120);
+    }
+  }
 }
 
 function renderGanttWeather(ym){
@@ -3713,20 +3736,23 @@ function renderAnalyze(){
       h+='<div class="stat-card" style="margin-bottom:12px;"><div class="stat-label">累計取引金額</div><div class="stat-val" style="font-size:26px;">'+(totalAmt>0?(totalAmt/10000).toFixed(1)+'万円':'—')+'</div></div>';
     } else if(id==='komisyon'){
       var totalFee = calcTotalFee(ftrades);
-      // 内訳（1.6%と1.8%を分けて表示）
       var fee16 = ftrades.filter(function(t){return getFeeRate(t.producerId,t.buyerId)===FEE_RATE_LOW;});
       var fee18 = ftrades.filter(function(t){return getFeeRate(t.producerId,t.buyerId)===FEE_RATE_HIGH;});
-      var amt16 = fee16.reduce(function(s,t){return s+tradeAmount(t);},0);
-      var amt18 = fee18.reduce(function(s,t){return s+tradeAmount(t);},0);
-      h+='<div class="stat-card" style="margin-bottom:16px;background:var(--gold-light);border-color:var(--gold-mid);cursor:pointer;user-select:none;" onclick="toggleKomisyon(this)">'
-        +'<div class="stat-label" style="color:var(--gold);">斡旋口銭（合計）<span style="font-size:10px;color:var(--hint);margin-left:6px;">タップで表示</span></div>'
-        +'<div class="komisyon-val" style="font-size:26px;color:var(--gold);filter:blur(6px);transition:filter .3s;">'+(totalFee>0?totalFee.toLocaleString()+'円':'—')+'</div>'
-        +'<div class="komisyon-val" style="font-size:11px;color:var(--gold);margin-top:4px;filter:blur(6px);transition:filter .3s;">'
-        +(amt16>0?'1.6%（湯日・下湯日・吹木→ハラダ）: '+Math.round(amt16*0.016).toLocaleString()+'円':'')
-        +(amt16>0&&amt18>0?' ／ ':'')
-        +(amt18>0?'1.8%（その他）: '+Math.round(amt18*0.018).toLocaleString()+'円':'')
-        +'</div>'
-        +'</div>';
+      var amt16 = fee16.reduce(function(s2,t){return s2+tradeAmount(t);},0);
+      var amt18 = fee18.reduce(function(s2,t){return s2+tradeAmount(t);},0);
+      var open = !!window._komiOpen;
+      h+='<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;">';
+      h+='<div onclick="toggleKomisyon()" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;user-select:none;">'
+        +'<span style="font-size:13px;font-weight:600;color:var(--muted);">💰 斡旋口銭</span>'
+        +'<span style="font-size:11px;color:var(--hint);">'+(open?'閉じる ▾':'タップで表示 ▸')+'</span></div>';
+      if(open){
+        h+='<div style="padding:0 16px 14px;border-top:1px solid var(--paper2);">'
+          +'<div style="font-size:24px;font-weight:700;color:var(--gold);margin-top:10px;">'+(totalFee>0?totalFee.toLocaleString()+'円':'—')+'</div>';
+        if(amt16>0) h+='<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px;"><span>1.6%（湯日・下湯日・吹木→ハラダ）</span><b style="color:var(--gold);">'+Math.round(amt16*0.016).toLocaleString()+'円</b></div>';
+        if(amt18>0) h+='<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:5px;"><span>1.8%（その他）</span><b style="color:var(--gold);">'+Math.round(amt18*0.018).toLocaleString()+'円</b></div>';
+        h+='</div>';
+      }
+      h+='</div>';
     } else if(id==='forecast'){
       // 現在の茶期を特定
       var currentSeasonName = '';
@@ -3890,9 +3916,16 @@ function renderAnalyze(){
             +'<div style="position:relative;height:'+h2+'px;"><div id="'+canvasId+'" data-ec style="width:100%;height:100%;"></div></div></div>';
         }
         h+='<div class="section-label">全体グラフ</div>';
+        var _ovm=window._ovMode||'producer';
+        function ovBtn(mode,label){
+          var on=_ovm===mode;
+          return '<button onclick="setOvMode(\''+mode+'\')" style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;background:'+(on?'var(--matcha)':'transparent')+';color:'+(on?'#fff':'var(--muted)')+';">'+label+'</button>';
+        }
+        h+='<div style="display:flex;gap:4px;background:var(--paper2);border-radius:10px;padding:4px;margin-bottom:12px;">'
+          +ovBtn('producer','🌿 生産家→茶商')+ovBtn('chasho','🏪 茶商間')+ovBtn('all','すべて')+'</div>';
         h+=ovBlock('📈 日別 出荷量と平均単価','ov-daily',230,'<div style="font-size:10px;color:var(--hint);margin-bottom:6px;">棒＝数量(kg)　線＝平均単価(円/kg)　※ピンチでズーム</div>');
         h+=ovBlock('🥧 売り先別 金額シェア','ov-share',230);
-        h+=ovBlock('🏆 生産家別 平均単価 TOP10','ov-prodprice',260);
+        h+=ovBlock('🏆 仕入元別 平均単価 TOP10','ov-prodprice',260);
         h+=ovBlock('🌿 品種別 数量・金額','ov-variety',230);
         h+=ovBlock('📦 累積出荷量の推移','ov-cumu',220,'<div style="font-size:10px;color:var(--hint);margin-bottom:6px;">茶期の進み具合がひと目で分かります</div>');
       }
@@ -4090,14 +4123,7 @@ function saveAnalyzeOrder(){
   _safeLS.setItem('ocha_analyze_order',JSON.stringify(analyzeOrder));
 }
 
-function toggleKomisyon(card){
-  var vals=card.querySelectorAll('.komisyon-val');
-  if(!vals.length) return;
-  var isHidden=vals[0].style.filter!=='none';
-  vals.forEach(function(v){ v.style.filter=isHidden?'none':'blur(6px)'; });
-  var hint=card.querySelector('span[style*="color:var(--hint)"]');
-  if(hint) hint.textContent=isHidden?'タップで隠す':'タップで表示';
-}
+function toggleKomisyon(){ window._komiOpen=!window._komiOpen; renderAnalyze(); }
 
 function toggleAnalyzeEdit(){
   var el=document.getElementById('analyze-content'); if(!el) return;
@@ -5215,10 +5241,24 @@ function ecAxisY(fmtFn,color){
 }
 
 /* ===== 全体グラフ（5種・ECharts） ===== */
+function setOvMode(m){ window._ovMode=m; renderAnalyze(); }
+function ovFilterTrades(){
+  var base=getFilteredTrades();
+  var mode=window._ovMode||'producer';
+  if(mode==='all') return base;
+  var chashoIds={}; partners.forEach(function(p){ if(p.type==='chasho') chashoIds[p.id]=1; });
+  return base.filter(function(t){ return mode==='chasho' ? !!chashoIds[t.producerId] : !chashoIds[t.producerId]; });
+}
 function renderOverviewCharts(){
   if(typeof echarts==='undefined') return;
-  var ftrades=getFilteredTrades();
-  if(!ftrades.length) return;
+  var ftrades=ovFilterTrades();
+  if(!ftrades.length){
+    ['ov-daily','ov-share','ov-prodprice','ov-variety','ov-cumu'].forEach(function(id){
+      var c=ecInit(id);
+      if(c) c.setOption({title:{text:'この区分の取引データがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}});
+    });
+    return;
+  }
 
   // 日別集計
   var byDate={};
