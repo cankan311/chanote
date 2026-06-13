@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.16-K</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-L</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1514,6 +1514,7 @@ function _finishLoad(){
     var ti = _safeLS.getItem('ocha_teai_images');
     if(ti) teaiImages = JSON.parse(ti);
   }catch(e){ teaiImages={}; }
+  setTimeout(function(){ try{ _migrateTeaiCompress(); }catch(e){} }, 800);
   loadMemos();
   loadActivityLog();
   var n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth();
@@ -1728,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.16-K</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-L</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2411,11 +2412,13 @@ function renderGanttMonth(){
       // 稼働記録 OR 取引記録があれば●
       var st=(activityLog[ds4]||{})[p.id]||'';
       var hasTx=!!(txByProd[p.id]&&txByProd[p.id][ds4]);
-      // 稼働記録優先、なければ取引記録で判断
-      var effective = st || (hasTx?'active':'');
-      var bg=effective==='active'?'#a8d8a8':effective==='rest'?'#f5a0a0':'';
-      var icon=effective==='active'?'●':effective==='rest'?'×':'';
-      var col=effective==='active'?'#2e7d32':effective==='rest'?'#c0392b':'var(--border)';
+      var isPastOrToday = ds4<=today;
+      // 手動の稼働/休み記録を最優先。なければ「過去日かつ取引あり」を自動○
+      var bg,icon,col;
+      if(st==='active'){ bg='#a8d8a8'; icon='●'; col='#2e7d32'; }
+      else if(st==='rest'){ bg='#f5a0a0'; icon='×'; col='#c0392b'; }
+      else if(hasTx && isPastOrToday){ bg='#d8efd8'; icon='○'; col='#2e7d32'; } // 取引から自動
+      else { bg=''; icon=''; col='var(--border)'; }
       var _t4=ds4===today;
       html+='<td onclick="cycleActivity(\''+ds4+'\','+p.id+')" style="padding:2px;border:1px solid '+(_t4?'var(--gold)':'var(--border)')+';border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;background:'+(bg||( _t4?'rgba(200,155,60,0.10)':''))+';font-size:12px;font-weight:700;color:'+col+';min-width:28px;cursor:pointer;user-select:none;">'+icon+'</td>';
     }
@@ -3762,16 +3765,38 @@ function renderOperationStats(){
 function _compressTeai(dataUrl, cb){
   var img=new Image();
   img.onload=function(){
-    var maxW=1600;
+    var maxW=1280;
     var scale=Math.min(1, maxW/img.width);
     var w=Math.round(img.width*scale), h=Math.round(img.height*scale);
     var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-    cv.getContext('2d').drawImage(img,0,0,w,h);
-    try{ cb(cv.toDataURL('image/jpeg',0.7)); }
+    var ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+    ctx.drawImage(img,0,0,w,h);
+    try{ cb(cv.toDataURL('image/jpeg',0.55)); }
     catch(e){ cb(dataUrl); }
   };
   img.onerror=function(){ cb(dataUrl); };
   img.src=dataUrl;
+}
+// 既存の無圧縮写真を一度だけ再圧縮して容量を空ける
+function _migrateTeaiCompress(){
+  var pending=[];
+  Object.keys(teaiImages).forEach(function(date){
+    (teaiImages[date]||[]).forEach(function(img){
+      if(img && img.data && img.c!==1) pending.push({date:date,img:img});
+    });
+  });
+  if(!pending.length) return;
+  var i=0;
+  function step(){
+    if(i>=pending.length){ _saveTeaiOnly(); try{renderCalTeai();renderCalendar();}catch(e){} return; }
+    var it=pending[i++];
+    _compressTeai(it.img.data, function(c){
+      it.img.data=c; it.img.c=1;
+      step();
+    });
+  }
+  step();
 }
 function _saveTeaiOnly(){
   // 手合わせ帳だけを独立して保存し、容量超過を検出する
@@ -3788,7 +3813,7 @@ function addTeaiImage(input){
     reader.onload=function(e){
       _compressTeai(e.target.result, function(compressed){
         if(!teaiImages[selectedDate]) teaiImages[selectedDate]=[];
-        var item={id:Date.now()+'_'+Math.random(),data:compressed};
+        var item={id:Date.now()+'_'+Math.random(),data:compressed,c:1};
         teaiImages[selectedDate].push(item);
         // 独立保存して容量を確認。失敗したら取り消してユーザーに通知
         if(_saveTeaiOnly()){
