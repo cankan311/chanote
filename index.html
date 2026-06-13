@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.17-P</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.18-Q</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1519,9 +1519,9 @@ function _finishLoad(){
   loadActivityLog();
   var n=new Date(); calYear=n.getFullYear(); calMonth=n.getMonth();
   var td=document.getElementById('t-date');
-  if(td) td.value=n.toISOString().split('T')[0];
+  if(td) td.value=localDateStr(n);
   var rd=document.getElementById('rest-date');
-  if(rd) rd.value=n.toISOString().split('T')[0];
+  if(rd) rd.value=localDateStr(n);
   initLots();
   renderAll();
 }
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.17-P</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.18-Q</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -1784,7 +1784,7 @@ function toggleDocSubmit(seasonKey, producerId, docType){
   var cur = (docSubmissions[seasonKey][producerId][docType]||{}).submitted;
   docSubmissions[seasonKey][producerId][docType] = {
     submitted: !cur,
-    date: !cur ? new Date().toISOString().split('T')[0] : ''
+    date: !cur ? todayStr() : ''
   };
   saveDocData();
   renderDocsTab();
@@ -2034,7 +2034,7 @@ function openMemoModal(){
   if(modal){ modal.style.display='flex'; }
   // 今日の日付をデフォルトに
   var dateEl = document.getElementById('memo-date');
-  if(dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  if(dateEl && !dateEl.value) dateEl.value = todayStr();
   showMemoTab('new');
 }
 function closeMemoModal(){
@@ -2208,7 +2208,7 @@ var activityLog = {};
 
 function _cleanPastActivity(){
   // 昨日以前の手入力のうち ●(active)/×(rest) は取引記録を正とするため掃除。△(worked)は残す。
-  var today=new Date().toISOString().split('T')[0];
+  var today=todayStr();
   var changed=false;
   Object.keys(activityLog).forEach(function(d){
     if(d<today){
@@ -2232,7 +2232,7 @@ function saveActivityLog(){
 function renderActivityCheck(){
   loadActivityLog(); loadMemos();
   var el = document.getElementById('activity-content'); if(!el) return;
-  var today = new Date().toISOString().split('T')[0];
+  var today = todayStr();
   // 対象生産家
   var prods = partners.filter(function(p){ return p.type==='producer'; });
 
@@ -2296,7 +2296,7 @@ function setActivityDate(date){
   renderActivityCheck();
 }
 function cycleActivity(date, pid){
-  var today=new Date().toISOString().split('T')[0];
+  var today=todayStr();
   var hasTx = trades.some(function(t){ return t.date===date && t.producerId===pid; });
   if(hasTx){ toast('この日は取引があるため●で確定です'); return; }
   // 今日でも既に取引が1件でもあれば、その日は確定（過去扱い）。△のみ手動可。
@@ -2337,7 +2337,7 @@ function renderGantt(){
   Object.keys(activityLog).forEach(function(d){ if(d) monthSet[d.slice(0,7)]=1; });
   trades.forEach(function(t){ if(t.date) monthSet[t.date.slice(0,7)]=1; });
   var months=Object.keys(monthSet).sort().reverse();
-  if(!months.length){ months=[new Date().toISOString().slice(0,7)]; }
+  if(!months.length){ months=[todayStr().slice(0,7)]; }
 
   // デフォルトは最新月
   if(!ganttYm||months.indexOf(ganttYm)<0) ganttYm=months[0];
@@ -2378,11 +2378,11 @@ function renderGanttMonth(){
   var ym=ganttYm;
   var y=parseInt(ym.slice(0,4)), m=parseInt(ym.slice(5));
   var days=new Date(y,m,0).getDate();
-  var today=new Date().toISOString().split('T')[0];
+  var today=todayStr();
 
   // 取引マップ（生産家別）
   var txByProd={};
-  var _todayStr=new Date().toISOString().split('T')[0];
+  var _todayStr=todayStr();
   var todayHasAnyTx=false;
   trades.forEach(function(t){
     if(t.date&&t.date.slice(0,7)===ym){
@@ -2799,7 +2799,7 @@ var BACKUP_KEYS=['ocha_partners','ocha_trades4','ocha_components','ocha_varietie
   'ocha_teai_images','ocha_season_defs','ocha_rest_days','ocha_analyze_order','ocha_orders'];
 
 function backupData(){
-  try{ _safeLS.setItem('ocha_last_backup', new Date().toISOString().split('T')[0]); }catch(e){}
+  try{ _safeLS.setItem('ocha_last_backup', todayStr()); }catch(e){}
   var data={_version:2,_date:new Date().toISOString()};
   data.ocha_partners=partners;
   data.ocha_trades4=trades;
@@ -3084,7 +3084,7 @@ function renderTradeList(){
     var marks=(t.lots||[]).map(function(l){return l.mark;}).join(' ');
     return (prod?prod.name:'').toLowerCase().indexOf(q)>=0||(buy?buy.name:'').toLowerCase().indexOf(q)>=0||(t.variety||'').toLowerCase().indexOf(q)>=0||marks.toLowerCase().indexOf(q)>=0||(t.date||'').indexOf(q)>=0;
   });
-  var _today=new Date().toISOString().split('T')[0];
+  var _today=todayStr();
   var _tToday=trades.filter(function(t){return t.date===_today;});
   var _tq=_tToday.reduce(function(x,t){return x+(t.totalQty||0);},0);
   var _ta=_tToday.reduce(function(x,t){return x+tradeAmount(t);},0);
@@ -3361,7 +3361,7 @@ function renderCalendar(){
   var title=document.getElementById('cal-title'), grid=document.getElementById('cal-grid');
   if(!title||!grid) return;
   title.textContent=calYear+'年 '+(calMonth+1)+'月';
-  var today=new Date().toISOString().split('T')[0];
+  var today=todayStr();
   var firstDay=new Date(calYear,calMonth,1).getDay();
   var daysInMonth=new Date(calYear,calMonth+1,0).getDate();
   var txByDate={};
@@ -3461,7 +3461,7 @@ function isRainyMm(mm){return mm!=null&&mm>=0.5;}
 
 async function fetchMonthWeather(yr,mo){
   var today=new Date(); today.setHours(0,0,0,0);
-  var todayStr=today.toISOString().split('T')[0];
+  var todayStr=localDateStr(today);
   var mkey=yr+'-'+String(mo+1).padStart(2,'0');
   if(fetchingMonth[mkey]) return;
   var lastDay=new Date(yr,mo+1,0).getDate();
@@ -3479,7 +3479,7 @@ async function fetchMonthWeather(yr,mo){
     // 過去データ（〜昨日）: Historical Forecast API + JMA
     if(monthStart<today){
       var pastEnd=monthEnd<today?monthEnd:new Date(today.getTime()-86400000);
-      var pastEndStr=pastEnd.toISOString().split('T')[0];
+      var pastEndStr=localDateStr(pastEnd);
       var pastStartStr=yr+'-'+String(mo+1).padStart(2,'0')+'-01';
       if(pastEndStr>=pastStartStr){
         var pastUrl='https://historical-forecast-api.open-meteo.com/v1/forecast'
@@ -3944,7 +3944,7 @@ function renderAnalyze(){
   var el=document.getElementById('analyze-content'); if(!el) return;
   if(!window._analyzeInit){
     window._analyzeInit=true;
-    var _today=new Date().toISOString().split('T')[0];
+    var _today=todayStr();
     analyzeYear=_today.slice(0,4);
     var _sn=seasonForDate(_today);
     if(_sn) analyzeSeason=_sn;
@@ -3954,7 +3954,7 @@ function renderAnalyze(){
   var total=ftrades.length;
   var totalQty=ftrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
   var totalAmt=ftrades.reduce(function(s,t){return s+tradeAmount(t);},0);
-  var thisMonth=new Date().toISOString().slice(0,7);
+  var thisMonth=todayStr().slice(0,7);
   var mTrades=ftrades.filter(function(t){return t.date&&t.date.indexOf(thisMonth)===0;});
   var mQty=mTrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
   var producers=partners.filter(function(p){return p.type==='producer'||p.type==='chasho';});
@@ -4465,7 +4465,8 @@ function saveOrders(){
 }
 
 // 今日の日付文字列
-function todayStr(){return new Date().toISOString().split('T')[0];}
+function localDateStr(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayStr(){ return localDateStr(new Date()); }
 
 // 注文タブ初期化：orderDate未設定なら今日にセット
 function initOrderDate(){
@@ -4475,7 +4476,7 @@ function initOrderDate(){
 function orderDateShift(delta){
   var d=new Date(orderDate);
   d.setDate(d.getDate()+delta);
-  orderDate=d.toISOString().split('T')[0];
+  orderDate=localDateStr(d);
   renderOrder();
 }
 function orderGoToday(){
@@ -5073,7 +5074,7 @@ function switchMarketTab(id, btn){
 }
 function addSoubaMemo(){
   openMemoModal();
-  var dt=document.getElementById('memo-date'); if(dt) dt.value=new Date().toISOString().split('T')[0];
+  var dt=document.getElementById('memo-date'); if(dt) dt.value=todayStr();
   // 「相場」タグを自動ON
   setTimeout(function(){
     document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
@@ -5799,7 +5800,7 @@ function tradeAmount(t){
 function renderHome(){
   var el=document.getElementById('home-content'); if(!el) return;
   var now=new Date();
-  var today=now.toISOString().split('T')[0];
+  var today=localDateStr(now);
   var youbi=['日','月','火','水','木','金','土'][now.getDay()];
   var hour=now.getHours();
   var greet=hour<4?'お疲れさまです':hour<10?'おはようございます':hour<18?'こんにちは':'こんばんは';
@@ -6014,7 +6015,7 @@ function shareDayImage(date){
 
 /* ===== 「○○さん今茶期サマリー」即答カード ===== */
 function buildPartnerSummaryCard(p, myTrades){
-  var today=new Date().toISOString().split('T')[0];
+  var today=todayStr();
   var sn=seasonForDate(today)||(getSeasonDefs().slice().sort(function(a,b){return String(b.startDate).localeCompare(String(a.startDate));})[0]||{}).name;
   if(!sn) return '';
   var isProducer=p.type==='producer';
