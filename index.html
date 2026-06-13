@@ -14,6 +14,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
+html[data-theme="dark"]{
+  --ink:#ece7df; --ink2:#cfc8bd; --muted:#9a948a; --hint:#6e685f;
+  --paper:#14120f; --paper2:#1d1a16; --surface:#211e19;
+  --border:#36312a; --border2:#46403f;
+  --matcha:#7db98d; --matcha-light:#22301f; --matcha-mid:#3a5a44;
+  --gold:#d4b870; --gold-light:#2c2615; --gold-mid:#6e5a2c;
+  --red:#d98080; --red-light:#321d1d; --danger:#e07070; --danger-bg:#321a1a;
+  --green-bg:#1d281f;
+  --shadow:0 2px 16px rgba(0,0,0,0.5); --shadow-sm:0 1px 6px rgba(0,0,0,0.4);
+}
+html[data-theme="dark"] .tab-bar{background:rgba(20,18,15,0.94);}
+html[data-theme="dark"] body::before{opacity:0.3;}
 :root{
   --ink:#1a1714;
   --ink2:#3d3730;
@@ -60,39 +73,45 @@ body{
 /* TAB BAR */
 .tab-bar{
   display:flex;
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
-  position:sticky;top:0;z-index:100;
-  box-shadow:var(--shadow-sm);
+  background:rgba(250,247,242,0.92);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-top:1px solid var(--border);
+  position:fixed;bottom:0;left:0;right:0;z-index:1000;
+  box-shadow:0 -6px 20px rgba(0,0,0,0.07);
   overflow-x:auto;
   -webkit-overflow-scrolling:touch;
   scrollbar-width:none;
+  padding-bottom:env(safe-area-inset-bottom);
+  justify-content:space-around;
 }
 .tab-bar::-webkit-scrollbar{display:none;}
 .tab{
-  flex:0 0 auto;
-  min-width:52px;
-  padding:8px 6px 6px;
-  font-size:8px;letter-spacing:.01em;
+  flex:1 1 0;
+  min-width:44px;
+  padding:7px 2px 8px;
+  font-size:9px;letter-spacing:.01em;
   text-align:center;color:var(--hint);
   cursor:pointer;border:none;background:none;
-  border-bottom:2px solid transparent;
-  transition:color .2s, border-color .2s;
+  transition:color .2s;
   font-family:'Noto Sans JP',sans-serif;
   -webkit-tap-highlight-color:transparent;
   touch-action:manipulation;
 }
-.tab.active{color:var(--matcha);border-bottom:2px solid var(--matcha);font-weight:700;}
+.tab.active{color:var(--matcha);font-weight:700;}
 .tab .ico{
   font-size:17px;display:flex;align-items:center;justify-content:center;
-  margin-bottom:2px;height:22px;
+  margin:0 auto 3px;height:26px;width:44px;max-width:100%;
+  border-radius:14px;
+  transition:background .22s, transform .22s;
 }
+.tab.active .ico{background:rgba(58,107,69,0.13);transform:translateY(-2px);}
+.tab:active .ico{transform:scale(0.92);}
 .tab .ico svg{transition:stroke .2s;}
 
 /* SCREENS */
-.screen{display:none;padding:20px 16px;padding-bottom:56px;position:relative;z-index:1;}
+.screen{display:none;padding:20px 16px;padding-bottom:calc(92px + env(safe-area-inset-bottom));position:relative;z-index:1;}
 .screen.active{display:block;}
-.detail-screen{display:none;padding:20px 16px;padding-bottom:56px;position:relative;z-index:1;}
+.detail-screen{display:none;padding:20px 16px;padding-bottom:calc(92px + env(safe-area-inset-bottom));position:relative;z-index:1;}
 .detail-screen.active{display:block;}
 
 /* TYPOGRAPHY */
@@ -526,7 +545,6 @@ button:active{transform:scale(0.96);}
 @keyframes screenIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 .screen.active{animation:screenIn .18s ease;}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,8px);}to{opacity:1;transform:translate(-50%,0);}}
-#gantt-scroll{scroll-behavior:smooth;}
 input,select,textarea{transition:border-color .15s ease, box-shadow .15s ease;}
 input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !important;box-shadow:0 0 0 3px rgba(58,107,69,0.08);}
 </style>
@@ -544,7 +562,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
 </div>
 
 <div class="tab-bar">
-  <button class="tab active" onclick="showScreen('trades')" id="tab-trades">
+  <button class="tab active" onclick="showScreen('home')" id="tab-home">
+    <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg></span>ホーム
+  </button>
+  <button class="tab" onclick="showScreen('trades')" id="tab-trades">
     <span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/></svg></span>取引
   </button>
   <button class="tab" onclick="showScreen('new-trade')" id="tab-new-trade">
@@ -574,7 +595,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
 </div>
 
 <!-- 取引一覧 -->
-<div id="screen-trades" class="screen active">
+<div id="screen-home" class="screen active">
+  <div class="page-title">ホーム</div>
+  <div id="home-content"></div>
+</div>
+
+<div id="screen-trades" class="screen">
   <div class="page-title">取引一覧</div>
   <input class="search-input" type="text" placeholder="🔍 生産家・売先・品種・荷印で検索..." id="trade-search" oninput="renderTradeList()">
   <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:14px;align-items:end;">
@@ -794,6 +820,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
     </div>
   </div>
 
+  <button onclick="quickMarketMemo()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;margin-bottom:16px;border-radius:14px;border:1.5px solid var(--gold-mid);background:var(--gold-light);color:var(--gold);font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">📝 今日の相場・茶況をメモする</button>
+
   <!-- コピー済みトースト表示エリア -->
   <div id="market-copy-toast" style="display:none;background:var(--matcha);color:#fff;border-radius:var(--radius-sm);padding:12px 16px;text-align:center;font-size:13px;font-weight:700;margin-bottom:12px;">
     ✅ コピーしました！Claudeに貼り付けてください
@@ -970,6 +998,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
 <!-- 設定 -->
 <div id="screen-settings" class="screen">
   <div class="page-title">設定</div>
+  <div class="section-label">🎨 テーマ</div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:18px;box-shadow:var(--shadow-sm);">
+    <div style="display:flex;gap:4px;background:var(--paper2);border-radius:10px;padding:4px;">
+      <button id="theme-btn-light" onclick="setTheme('light')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">☀️ ライト</button>
+      <button id="theme-btn-dark" onclick="setTheme('dark')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">🌙 ダーク</button>
+      <button id="theme-btn-auto" onclick="setTheme('auto')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📱 端末に合わせる</button>
+    </div>
+    <div id="settings-backup-info" style="font-size:11px;color:var(--hint);margin-top:10px;text-align:center;"></div>
+  </div>
+  <div class="page-title">設定</div>
   <div class="section-label" style="margin-top:0;">茶期の管理</div>
   <div class="card">
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">茶期名と期間を登録してください。取引記録の茶期選択肢と予測計算に使用します。</div>
@@ -1019,7 +1057,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.14-D</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.15-F</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1086,7 +1124,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
 </div><!-- /#app -->
 
 <!-- フローティングメモボタン -->
-<button id="fab-memo" onclick="openMemoModal()" style="position:fixed;right:18px;bottom:80px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(255,152,0,0.45);z-index:800;display:flex;align-items:center;justify-content:center;transition:transform .15s;">📝</button>
+<button id="fab-memo" onclick="openMemoModal()" style="position:fixed;right:18px;bottom:calc(96px + env(safe-area-inset-bottom));width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(255,152,0,0.45);z-index:800;display:flex;align-items:center;justify-content:center;transition:transform .15s;">📝</button>
 
 <!-- メモモーダル -->
 <div id="memo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:flex-end;">
@@ -1258,6 +1296,32 @@ try{
     _safeLS.setItem('ocha_restore_memos_v1','1');
   }
 }catch(e){}
+
+/* ===== テーマ（ダークモード） ===== */
+function applyTheme(){
+  var m='light';
+  try{ m=_safeLS.getItem('ocha_theme')||'auto'; }catch(e){ m='auto'; }
+  var dark = m==='dark' || (m==='auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  var mc=document.querySelector('meta[name="theme-color"]');
+  if(mc) mc.setAttribute('content', dark?'#14120f':'#3a6b45');
+}
+function setTheme(m){
+  try{ _safeLS.setItem('ocha_theme', m); }catch(e){}
+  applyTheme(); renderThemeButtons();
+}
+function renderThemeButtons(){
+  var cur='auto'; try{ cur=_safeLS.getItem('ocha_theme')||'auto'; }catch(e){}
+  ['light','dark','auto'].forEach(function(m){
+    var b=document.getElementById('theme-btn-'+m); if(!b) return;
+    var on=cur===m;
+    b.style.background=on?'var(--matcha)':'transparent';
+    b.style.color=on?'#fff':'var(--muted)';
+  });
+}
+applyTheme();
+if(window.matchMedia){ try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); }catch(e){} }
+
 _MEM['ocha_partners']   =JSON.stringify(PARTNERS_DATA);
 _MEM['ocha_trades4']    =JSON.stringify(TRADES_DATA);
 _MEM['ocha_varieties']  =JSON.stringify(VARIETIES_DATA);
@@ -1397,6 +1461,7 @@ function loadFromFile(input){
 }
 
 function _finishLoad(){
+  setTimeout(function(){ try{renderHome();}catch(e){} },0);
   // teaiImagesはlocalStorageから読み込む（HTMLには焼き込まない）
   try{
     var ti = _safeLS.getItem('ocha_teai_images');
@@ -1416,6 +1481,7 @@ function _finishLoad(){
 function save(){
   _saveToLocalStorage();
   _markUnsaved();
+  try{ if(document.getElementById('screen-home').classList.contains('active')) renderHome(); }catch(e){}
 }
 
 function renderAll(){
@@ -1447,11 +1513,14 @@ function showScreen(name){
   var tab=document.getElementById('tab-'+name);
   if(el) el.classList.add('active');
   if(tab) tab.classList.add('active');
+  if(name==='home') renderHome();
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
   if(name==='order') renderOrder();
   if(name==='market') initMarketPreviews();
-  if(name==='settings'){ notionLoadSettings(); gsLoadSettings(); }
+  if(name==='settings'){ notionLoadSettings(); gsLoadSettings(); renderThemeButtons();
+    try{ var lb=_safeLS.getItem('ocha_last_backup'); var bi=document.getElementById('settings-backup-info'); if(bi) bi.textContent=lb?('最終バックアップ：'+lb):'バックアップはまだ取得されていません'; }catch(e){}
+  }
   if(name==='docs') renderDocsScreen();
 }
 
@@ -1612,7 +1681,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.14-D</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.15-F</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2120,6 +2189,7 @@ function setActivityDate(date){
   renderActivityCheck();
 }
 function cycleActivity(date, pid){
+  if(navigator.vibrate) navigator.vibrate(8);
   loadActivityLog();
   if(!activityLog[date]) activityLog[date]={};
   var cur = activityLog[date][pid]||'';
@@ -2265,6 +2335,7 @@ function renderGanttMonth(){
   el.innerHTML=html;
   var _sc=document.getElementById('gantt-scroll');
   if(_sc){
+    _sc.style.scrollBehavior='auto';
     if(_prevScroll){ _sc.scrollLeft=_prevScroll; }
     else {
       var _tc=document.getElementById('gantt-today-col');
@@ -2594,6 +2665,7 @@ var BACKUP_KEYS=['ocha_partners','ocha_trades4','ocha_components','ocha_varietie
   'ocha_teai_images','ocha_season_defs','ocha_rest_days','ocha_analyze_order','ocha_orders'];
 
 function backupData(){
+  try{ _safeLS.setItem('ocha_last_backup', new Date().toISOString().split('T')[0]); }catch(e){}
   var data={_version:2,_date:new Date().toISOString()};
   data.ocha_partners=partners;
   data.ocha_trades4=trades;
@@ -2876,8 +2948,25 @@ function renderTradeList(){
     var marks=(t.lots||[]).map(function(l){return l.mark;}).join(' ');
     return (prod?prod.name:'').toLowerCase().indexOf(q)>=0||(buy?buy.name:'').toLowerCase().indexOf(q)>=0||(t.variety||'').toLowerCase().indexOf(q)>=0||marks.toLowerCase().indexOf(q)>=0||(t.date||'').indexOf(q)>=0;
   });
-  if(!list.length){el.innerHTML='<div class="empty-state"><span class="empty-ico">📋</span>取引記録がありません<br><small>「記録」タブから追加してください</small></div>';return;}
-  el.innerHTML=list.map(function(t){
+  var _today=new Date().toISOString().split('T')[0];
+  var _tToday=trades.filter(function(t){return t.date===_today;});
+  var _tq=_tToday.reduce(function(x,t){return x+(t.totalQty||0);},0);
+  var _ta=_tToday.reduce(function(x,t){return x+tradeAmount(t);},0);
+  var _vq=list.reduce(function(x,t){return x+(t.totalQty||0);},0);
+  var _va=list.reduce(function(x,t){return x+tradeAmount(t);},0);
+  function _chip(label,val,accent){
+    return '<div style="flex:1;min-width:0;background:'+(accent?'linear-gradient(135deg,var(--green-bg),var(--surface))':'var(--surface)')+';border:1px solid var(--border);border-radius:12px;padding:9px 6px;text-align:center;">'
+      +'<div style="font-size:9px;color:var(--hint);font-weight:700;">'+label+'</div>'
+      +'<div style="font-size:13px;font-weight:800;color:'+(accent?'var(--matcha)':'var(--ink)')+';margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+val+'</div></div>';
+  }
+  var _dash='<div style="display:flex;gap:7px;margin-bottom:14px;">'
+    +_chip('今日の取引',_tToday.length+'件',true)
+    +_chip('今日の数量',(_tq>=1000?(_tq/1000).toFixed(2)+'t':Math.round(_tq).toLocaleString()+'kg'),true)
+    +_chip('今日 平均単価',(_tq>0?Math.round(_ta/_tq).toLocaleString()+'円':'—'))
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--hint);margin-bottom:8px;text-align:right;">表示中 '+list.length+'件 ／ '+(_vq>=1000?(_vq/1000).toFixed(2)+'t':Math.round(_vq).toLocaleString()+'kg')+' ／ '+( _va>=100000000?(_va/100000000).toFixed(2)+'億円':Math.round(_va/10000).toLocaleString()+'万円')+'</div>';
+  if(!list.length){el.innerHTML=_dash+'<div class="empty-state"><span class="empty-ico">📋</span>取引記録がありません<br><small>「記録」タブから追加してください</small></div>';return;}
+  el.innerHTML=_dash+list.map(function(t){
     var prod=partners.find(function(p){return p.id===t.producerId;});
     var buy=partners.find(function(p){return p.id===t.buyerId;});
     var marks=(t.lots||[]).filter(function(l){return l.mark;}).map(function(l){return l.mark;}).join('・');
@@ -4881,6 +4970,17 @@ function renderDayMemos(date){
   }).join('');
   return h;
 }
+function quickMarketMemo(){
+  openMemoModal();
+  var today=new Date().toISOString().split('T')[0];
+  var dt=document.getElementById('memo-date'); if(dt) dt.value=today;
+  document.querySelectorAll('#memo-view-new [data-tag]').forEach(function(btn){
+    if(btn.dataset.tag==='相場'){
+      btn.dataset.active='1';
+      btn.style.background='#ff9800'; btn.style.color='#fff'; btn.style.borderColor='#ff9800';
+    }
+  });
+}
 function memoForDate(date){
   openMemoModal();
   var dt=document.getElementById('memo-date'); if(dt) dt.value=date;
@@ -5152,7 +5252,7 @@ function showUndoBar(msg){
   var bar=document.getElementById('undo-bar');
   if(!bar){
     bar=document.createElement('div'); bar.id='undo-bar';
-    bar.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:99998;background:#2c2c2c;color:#fff;border-radius:24px;padding:9px 10px 9px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.35);font-family:\'Noto Sans JP\',sans-serif;font-size:13px;max-width:92%;';
+    bar.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));z-index:99998;background:#2c2c2c;color:#fff;border-radius:24px;padding:9px 10px 9px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.35);font-family:\'Noto Sans JP\',sans-serif;font-size:13px;max-width:92%;';
     document.body.appendChild(bar);
   }
   bar.innerHTML='<span id="undo-bar-msg" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>'
@@ -5490,6 +5590,109 @@ function tradeAmount(t){
     var s=0; t.lots.forEach(function(l){ s+=(l.qty||0)*lotPrice(t,l); }); return s;
   }
   return (t.totalQty||0)*(t.price||0);
+}
+
+
+/* ===== ホーム画面 ===== */
+function renderHome(){
+  var el=document.getElementById('home-content'); if(!el) return;
+  var now=new Date();
+  var today=now.toISOString().split('T')[0];
+  var youbi=['日','月','火','水','木','金','土'][now.getDay()];
+  var hour=now.getHours();
+  var greet=hour<4?'お疲れさまです':hour<10?'おはようございます':hour<18?'こんにちは':'こんばんは';
+
+  var tToday=trades.filter(function(t){return t.date===today;});
+  var tq=tToday.reduce(function(s,t){return s+(t.totalQty||0);},0);
+  var ta=tToday.reduce(function(s,t){return s+tradeAmount(t);},0);
+
+  var h='';
+
+  // 挨拶 + 天気
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+    +'<div><div style="font-size:13px;color:var(--muted);">'+greet+'</div>'
+    +'<div style="font-family:\'Noto Serif JP\',serif;font-size:17px;font-weight:700;">'+(now.getMonth()+1)+'月'+now.getDate()+'日（'+youbi+'）</div></div>'
+    +'<div id="home-weather" style="text-align:right;font-size:12px;color:var(--muted);"></div></div>';
+
+  // バックアップ注意
+  var lastBk=''; try{ lastBk=_safeLS.getItem('ocha_last_backup')||''; }catch(e){}
+  var bkDays=lastBk?Math.floor((now-new Date(lastBk+'T00:00:00'))/86400000):999;
+  if(bkDays>=7){
+    h+='<div onclick="backupData()" style="display:flex;justify-content:space-between;align-items:center;background:var(--gold-light);border:1px solid var(--gold-mid);border-radius:12px;padding:11px 14px;margin-bottom:14px;cursor:pointer;">'
+      +'<span style="font-size:12px;color:var(--gold);font-weight:700;">⚠️ '+(lastBk?'バックアップから'+bkDays+'日経過':'バックアップ未取得')+'</span>'
+      +'<span style="font-size:11px;color:var(--gold);font-weight:700;">💾 今すぐ保存 ▸</span></div>';
+  }
+
+  // 今日のサマリー
+  function hc(label,val,sub){
+    return '<div style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:var(--shadow-sm);">'
+      +'<div style="font-size:9px;color:var(--hint);font-weight:700;">'+label+'</div>'
+      +'<div style="font-size:17px;font-weight:800;color:var(--matcha);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+val+'</div>'
+      +(sub?'<div style="font-size:9px;color:var(--hint);margin-top:1px;">'+sub+'</div>':'')+'</div>';
+  }
+  h+='<div class="section-label">今日のうごき</div>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:16px;">'
+    +hc('取引',tToday.length+'<span style="font-size:11px;">件</span>')
+    +hc('数量',(tq>=1000?(tq/1000).toFixed(2)+'<span style="font-size:11px;">t</span>':Math.round(tq).toLocaleString()+'<span style="font-size:11px;">kg</span>'))
+    +hc('平均単価',(tq>0?Math.round(ta/tq).toLocaleString():'—'),'円/kg')
+    +hc('金額',(ta>=10000?Math.round(ta/10000).toLocaleString()+'<span style="font-size:11px;">万</span>':Math.round(ta).toLocaleString()))
+    +'</div>';
+
+  // クイックアクション
+  function qa(ico,label,onclick){
+    return '<button onclick="'+onclick+'" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:13px 4px;border:1px solid var(--border);border-radius:14px;background:var(--surface);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;box-shadow:var(--shadow-sm);"><span style="font-size:21px;">'+ico+'</span><span style="font-size:10px;font-weight:700;color:var(--ink2);">'+label+'</span></button>';
+  }
+  h+='<div style="display:flex;gap:8px;margin-bottom:18px;">'
+    +qa('✏️','取引を記録',"showScreen('new-trade')")
+    +qa('📝','メモ','openMemoModal()')
+    +qa('📊','稼働表',"showScreen('calendar');showCalTab('gantt')")
+    +qa('📈','分析',"showScreen('analyze')")
+    +'</div>';
+
+  // 茶期の進捗
+  var sn=seasonForDate(today);
+  if(sn){
+    var sd=getSeasonDefs().filter(function(x){return x.name===sn;}).sort(function(a,b){return String(b.startDate).localeCompare(String(a.startDate));})[0];
+    if(sd){
+      var st=new Date(sd.startDate+'T00:00:00'), en=new Date(sd.endDate+'T00:00:00');
+      var pct=Math.min(100,Math.max(0,Math.round((now-st)/(en-st)*100)));
+      var sTr=trades.filter(function(t){return t.season===sn && t.date>=sd.startDate && t.date<=sd.endDate;});
+      var sq=sTr.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
+      var sa=sTr.reduce(function(s2,t){return s2+tradeAmount(t);},0);
+      var remain=Math.max(0,Math.ceil((en-now)/86400000));
+      h+='<div class="section-label">'+sn+'の進捗</div>';
+      h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm);">'
+        +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px;"><span>'+sd.startDate.slice(5).replace('-','/')+' 〜 '+sd.endDate.slice(5).replace('-','/')+'</span><span>残り'+remain+'日</span></div>'
+        +'<div style="height:8px;background:var(--paper2);border-radius:4px;overflow:hidden;margin-bottom:10px;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(to right,var(--matcha),#5cab7a);border-radius:4px;"></div></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:12px;">'
+        +'<span style="color:var(--muted);">累計 <b style="color:var(--matcha);">'+(sq>=1000?(sq/1000).toFixed(2)+'t':Math.round(sq).toLocaleString()+'kg')+'</b>（'+sTr.length+'件）</span>'
+        +'<span style="color:var(--muted);">金額 <b style="color:var(--matcha);">'+(sa>=100000000?(sa/100000000).toFixed(2)+'億円':Math.round(sa/10000).toLocaleString()+'万円')+'</b></span></div></div>';
+    }
+  }
+
+  // 直近の取引
+  var recent=trades.slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;}).slice(0,3);
+  if(recent.length){
+    h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">直近の取引 <button onclick="showScreen(\'trades\')" style="font-size:10px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">すべて見る ▸</button></div>';
+    recent.forEach(function(t){
+      var prod=partners.find(function(p){return p.id===t.producerId;});
+      var buy=partners.find(function(p){return p.id===t.buyerId;});
+      h+='<div class="trade-card" onclick="showTradeDetail('+t.id+')"><div class="trade-header"><span class="trade-date">📅 '+t.date+'</span><span class="trade-amount">'+tradeAmount(t).toLocaleString()+'円</span></div><div class="trade-flow">🌿 '+(prod?prod.name:'—')+' → 🏪 '+(buy?buy.name:'—')+'</div></div>';
+    });
+  }
+
+  // 今日のメモ
+  loadMemos();
+  h+=renderDayMemos(today);
+
+  el.innerHTML=h;
+
+  // 天気（非同期）
+  fetchMonthWeather(now.getFullYear(), now.getMonth()).then(function(){
+    var w=weatherCache[today];
+    var we=document.getElementById('home-weather');
+    if(w&&we) we.innerHTML='<span style="font-size:22px;">'+w.icon+'</span><div>'+(w.tMax!=null&&w.tMax!=='—'?'<span style="color:#e06c6c;font-weight:700;">'+Math.round(w.tMax)+'°</span> / <span style="color:#2980b9;">'+Math.round(w.tMin)+'°</span>':'')+(w.jmaPop!=null?'　☔'+w.jmaPop+'%':'')+'</div>';
+  }).catch(function(){});
 }
 
 load();
