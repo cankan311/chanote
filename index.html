@@ -477,7 +477,7 @@ html[data-theme="dark"] .tab-bar{ background:rgba(33,30,25,0.72); border-color:r
 .market-link{
   display:flex;align-items:center;justify-content:space-between;
   text-decoration:none;padding:14px 4px;
-  border-bottom:1px solid var(--paper2);
+  border-bottom:1px solid var(--border);
   transition:padding-left .2s;
 }
 .market-link:last-child{border-bottom:none;}
@@ -485,7 +485,7 @@ html[data-theme="dark"] .tab-bar{ background:rgba(33,30,25,0.72); border-color:r
 
 /* TOAST */
 .toast{
-  position:fixed;bottom:36px;left:50%;transform:translateX(-50%);
+  position:fixed;bottom:calc(96px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
   background:var(--ink);color:#fff;
   padding:11px 24px;border-radius:30px;
   font-size:13px;font-weight:500;
@@ -512,14 +512,14 @@ html[data-theme="dark"] .tab-bar{ background:rgba(33,30,25,0.72); border-color:r
 
 /* ACCENT CARDS */
 .accent-card-green{
-  background:linear-gradient(135deg,var(--matcha-light),#ddeee0);
-  border:1.5px solid var(--matcha-mid);
+  background:var(--matcha-light);
+  border:1px solid var(--matcha-mid);
   border-radius:var(--radius);
   padding:16px 18px;margin-bottom:14px;
 }
 .accent-card-gold{
-  background:linear-gradient(135deg,var(--gold-light),#fdf3e0);
-  border:1.5px solid var(--gold-mid);
+  background:var(--gold-light);
+  border:1px solid var(--gold-mid);
   border-radius:var(--radius);
   padding:16px 18px;margin-bottom:14px;
 }
@@ -536,17 +536,17 @@ html[data-theme="dark"] .tab-bar{ background:rgba(33,30,25,0.72); border-color:r
   box-shadow:0 2px 8px rgba(138,106,42,0.3);
 }
 .market-tab-btn{
-  padding:8px 14px;font-size:12px;font-weight:600;
+  padding:8px 15px;font-size:12.5px;font-weight:700;
   border-radius:20px;white-space:nowrap;
-  border:1.5px solid var(--border2);
+  border:1px solid var(--border);
   background:var(--surface);color:var(--muted);
   cursor:pointer;font-family:'Noto Sans JP',sans-serif;
-  transition:all .2s;flex-shrink:0;
+  transition:all .2s var(--ease);flex-shrink:0;
 }
 .market-tab-btn.active{
   background:var(--matcha);color:#fff;
   border-color:var(--matcha);
-  box-shadow:0 2px 8px rgba(58,107,69,0.25);
+  box-shadow:0 3px 10px rgba(52,104,74,0.22);
 }
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 
@@ -648,7 +648,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 </div>
 
 <div id="screen-trades" class="screen">
-  <div class="page-title">取引一覧</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">取引一覧</div>
   <input class="search-input" type="text" placeholder="🔍 生産家・売先・品種・荷印で検索..." id="trade-search" oninput="renderTradeList()">
   <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:14px;align-items:end;">
     <div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:500;">開始日</label>
@@ -747,7 +747,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- 取引先 -->
 <div id="screen-partners" class="screen">
-  <div class="page-title">取引先</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">取引先</div>
   <div class="filter-row">
     <button class="filter-btn active" onclick="filterPartners('all',this)">すべて</button>
     <button class="filter-btn" onclick="filterPartners('producer',this)">生産家</button>
@@ -844,19 +844,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- 分析 -->
 <div id="screen-analyze" class="screen">
-  <div class="page-title">分析</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">分析</div>
   <!-- サブタブ -->
-  <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--paper2);padding:4px;border-radius:10px;">
-    <button id="analyze-tab-summary" onclick="showAnalyzeTab('summary')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--matcha);color:#fff;">📊 集計</button>
-    <button id="analyze-tab-graph"   onclick="showAnalyzeTab('graph')"   style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📈 グラフ</button>
-    <button id="analyze-tab-forecast" onclick="showAnalyzeTab('forecast')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">🔮 予測</button>
+  <div class="seg" style="display:flex;gap:3px;margin-bottom:14px;background:var(--paper2);padding:3px;border-radius:13px;">
+    <button id="analyze-tab-summary" onclick="showAnalyzeTab('summary')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">集計</button>
+    <button id="analyze-tab-graph"   onclick="showAnalyzeTab('graph')"   style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">グラフ</button>
+    <button id="analyze-tab-forecast" onclick="showAnalyzeTab('forecast')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">予測</button>
   </div>
   <div id="analyze-content"></div>
 </div>
 
 <!-- 市場情報 -->
 <div id="screen-market" class="screen">
-  <div class="page-title">市場情報</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">市場情報</div>
 
   <!-- 使い方説明 -->
   <div style="background:linear-gradient(135deg,var(--matcha-light),#edf5ef);border:1px solid var(--matcha-mid);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;">
@@ -995,15 +995,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- 注文 -->
 <div id="screen-order" class="screen">
-  <div class="page-title">注文帳</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">注文帳</div>
 
   <!-- 日付ナビ -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <button id="order-prev-btn" onclick="orderDateShift(-1)" style="padding:8px 16px;font-size:18px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);cursor:pointer;color:var(--ink2);">‹</button>
+    <button id="order-prev-btn" onclick="orderDateShift(-1)" style="width:42px;height:42px;font-size:18px;background:var(--surface);border:1px solid var(--border);border-radius:13px;cursor:pointer;color:var(--ink2);">‹</button>
     <div style="text-align:center;">
       <div id="order-date-label" style="font-size:16px;font-weight:700;color:var(--ink);font-family:'Noto Serif JP',serif;"></div>
     </div>
-    <button id="order-next-btn" onclick="orderDateShift(1)" style="padding:8px 16px;font-size:18px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-sm);cursor:pointer;color:var(--ink2);">›</button>
+    <button id="order-next-btn" onclick="orderDateShift(1)" style="width:42px;height:42px;font-size:18px;background:var(--surface);border:1px solid var(--border);border-radius:13px;cursor:pointer;color:var(--ink2);">›</button>
   </div>
   <button onclick="orderGoToday()" style="width:100%;padding:8px;font-size:12px;border:1px dashed var(--border2);border-radius:var(--radius-sm);background:transparent;color:var(--muted);cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:16px;">📅 今日の注文（明日商い用）に戻る</button>
 
@@ -1063,13 +1063,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- 書類管理 -->
 <div id="screen-docs" class="screen">
-  <div class="page-title">書類管理</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">書類管理</div>
 
   <!-- 内部タブ -->
-  <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--paper2);padding:4px;border-radius:10px;">
-    <button id="docs-tab-trace" onclick="showDocsTab('trace')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--matcha);color:#fff;">🌿 防除履歴</button>
-    <button id="docs-tab-check" onclick="showDocsTab('check')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📋 照合表</button>
-    <button id="docs-tab-results" onclick="showDocsTab('results')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📊 経営実績</button>
+  <div class="seg" style="display:flex;gap:3px;margin-bottom:16px;background:var(--paper2);padding:3px;border-radius:13px;">
+    <button id="docs-tab-trace" onclick="showDocsTab('trace')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">防除履歴</button>
+    <button id="docs-tab-check" onclick="showDocsTab('check')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">照合表</button>
+    <button id="docs-tab-results" onclick="showDocsTab('results')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">経営実績</button>
   </div>
 
   <!-- シーズン選択 -->
@@ -1086,17 +1086,16 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- 設定 -->
 <div id="screen-settings" class="screen">
-  <div class="page-title">設定</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">設定</div>
   <div class="section-label">🎨 テーマ</div>
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:18px;box-shadow:var(--shadow-sm);">
-    <div style="display:flex;gap:4px;background:var(--paper2);border-radius:10px;padding:4px;">
+    <div class="seg" style="display:flex;gap:3px;background:var(--paper2);border-radius:13px;padding:3px;">
       <button id="theme-btn-light" onclick="setTheme('light')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">☀️ ライト</button>
       <button id="theme-btn-dark" onclick="setTheme('dark')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">🌙 ダーク</button>
       <button id="theme-btn-auto" onclick="setTheme('auto')" style="flex:1;padding:9px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📱 端末に合わせる</button>
     </div>
     <div id="settings-backup-info" style="font-size:11px;color:var(--hint);margin-top:10px;text-align:center;"></div>
   </div>
-  <div class="page-title">設定</div>
   <div class="section-label" style="margin-top:0;">茶期の管理</div>
   <div class="card">
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">茶期名と期間を登録してください。取引記録の茶期選択肢と予測計算に使用します。</div>
@@ -1146,7 +1145,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.24-AE</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.24-AH</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1712,8 +1711,8 @@ function showDocsTab(tab){
   ['trace','check','results'].forEach(function(t){
     var btn = document.getElementById('docs-tab-'+t);
     if(!btn) return;
-    btn.style.background = t===tab ? 'var(--matcha)' : 'transparent';
-    btn.style.color      = t===tab ? '#fff' : 'var(--muted)';
+    if(t===tab){ btn.style.background='var(--surface)'; btn.style.color='var(--matcha)'; btn.style.boxShadow='var(--shadow-sm)'; }
+    else { btn.style.background='transparent'; btn.style.color='var(--muted)'; btn.style.boxShadow='none'; }
   });
   renderDocsTab();
 }
@@ -1813,7 +1812,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.24-AE</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.24-AH</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -4127,8 +4126,8 @@ function showAnalyzeTab(tab){
   ['summary','graph','forecast'].forEach(function(t){
     var btn = document.getElementById('analyze-tab-'+t);
     if(!btn) return;
-    btn.style.background = t===tab ? 'var(--matcha)' : 'transparent';
-    btn.style.color      = t===tab ? '#fff' : 'var(--muted)';
+    if(t===tab){ btn.style.background='var(--surface)'; btn.style.color='var(--matcha)'; btn.style.boxShadow='var(--shadow-sm)'; }
+    else { btn.style.background='transparent'; btn.style.color='var(--muted)'; btn.style.boxShadow='none'; }
   });
   renderAnalyze();
 }
@@ -6092,6 +6091,10 @@ function renderHome(){
     +_qa('<path d="M6 20V14M12 20V4M18 20v-6"/>','分析',"showScreen('analyze')")
     +'</div>';
 
+  /* ---- ホーム：当月カレンダー ---- */
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
+  h+='<div class="card" id="home-cal-card" style="padding:14px 14px 12px;"></div>';
+
   /* ---- カレンダー（ミニ） ---- */
   h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
   h+='<div id="home-cal"></div>';
@@ -6176,6 +6179,8 @@ function renderHome(){
   el.innerHTML=h;
   try{ renderHomeCal(); }catch(e){}
 
+  try{ renderHomeCalendar(); }catch(e){}
+
   // 直近の取引の最後の行の下線を消す
   var rows=el.querySelector('.rows');
   if(rows && rows.lastElementChild){ rows.lastElementChild.style.borderBottom='none'; }
@@ -6237,6 +6242,54 @@ function renderHomeCal(){
   }
   h+='</div></div>';
   el.innerHTML=h;
+}
+
+
+/* ===== ホーム用 当月カレンダー ===== */
+var homeCalY=null, homeCalM=null;
+function homeCalPrev(){ if(homeCalY==null){var n=new Date();homeCalY=n.getFullYear();homeCalM=n.getMonth();} homeCalM--; if(homeCalM<0){homeCalM=11;homeCalY--;} renderHomeCalendar(); }
+function homeCalNext(){ if(homeCalY==null){var n=new Date();homeCalY=n.getFullYear();homeCalM=n.getMonth();} homeCalM++; if(homeCalM>11){homeCalM=0;homeCalY++;} renderHomeCalendar(); }
+function homeOpenDay(ds){
+  var y=parseInt(ds.slice(0,4)), m=parseInt(ds.slice(5,7))-1;
+  calYear=y; calMonth=m; selectedDate=ds;
+  showScreen('calendar'); showCalTab('cal');
+  try{ renderCalendar(); }catch(e){}
+}
+function renderHomeCalendar(){
+  var card=document.getElementById('home-cal-card'); if(!card) return;
+  var now=new Date();
+  if(homeCalY==null){ homeCalY=now.getFullYear(); homeCalM=now.getMonth(); }
+  var y=homeCalY, m=homeCalM;
+  var today=todayStr();
+  var firstDay=new Date(y,m,1).getDay();
+  var dim=new Date(y,m+1,0).getDate();
+  var txByDate={}; trades.forEach(function(t){ if(t.date) txByDate[t.date]=1; });
+  var days=['日','月','火','水','木','金','土'];
+  var H='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    +'<button onclick="homeCalPrev()" style="width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;">‹</button>'
+    +'<span class="serif" style="font-size:16px;font-weight:700;">'+y+'年 '+(m+1)+'月</span>'
+    +'<button onclick="homeCalNext()" style="width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;">›</button></div>';
+  H+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">';
+  H+=days.map(function(d,i){return '<div style="text-align:center;font-size:10px;font-weight:700;color:'+(i===0?'#c0392b':i===6?'#2980b9':'var(--hint)')+';padding:3px 0;">'+d+'</div>';}).join('');
+  for(var i=0;i<firstDay;i++) H+='<div></div>';
+  for(var d=1;d<=dim;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isT=ds===today;
+    var dot=''; 
+    var hasTx=txByDate[ds];
+    var hasMemo=!!(quickMemos[ds]&&quickMemos[ds].length);
+    var hasTeai=!!(teaiImages[ds]&&teaiImages[ds].length);
+    var dots='';
+    if(hasTx) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--matcha);"></span>';
+    if(hasMemo) dots+='<span style="width:5px;height:5px;border-radius:50%;background:#ff9800;"></span>';
+    if(hasTeai) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--gold);"></span>';
+    H+='<div onclick="homeOpenDay(\''+ds+'\')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;cursor:pointer;'
+      +(isT?'background:var(--matcha);color:#fff;font-weight:800;':'color:var(--ink);')+'">'
+      +'<span class="num" style="font-size:13px;">'+d+'</span>'
+      +'<span style="display:flex;gap:2px;height:5px;">'+(isT?'':dots)+'</span></div>';
+  }
+  H+='</div>';
+  card.innerHTML=H;
 }
 
 function _hStat(v,l){
