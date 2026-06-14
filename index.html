@@ -577,9 +577,9 @@ input,select,textarea{border-radius:var(--radius-sm)!important;font-size:15px;}
 button{ -webkit-tap-highlight-color:transparent; }
 /* スクロール時に隠れる下バー用 余白確保済み */
 /* スワイプ戻るの視覚ヒント */
-#edge-back-hint{position:fixed;top:0;bottom:0;left:0;width:0;z-index:1400;pointer-events:none;
-  background:linear-gradient(to right,rgba(58,107,69,0.18),transparent);
-  display:flex;align-items:center;padding-left:6px;color:var(--matcha);opacity:0;transition:opacity .1s;}
+#edge-back-hint{position:fixed;top:0;bottom:0;right:0;width:0;z-index:1400;pointer-events:none;
+  background:linear-gradient(to left,rgba(52,104,74,0.20),transparent);
+  display:flex;align-items:center;justify-content:flex-end;padding-right:6px;color:var(--matcha);opacity:0;transition:opacity .1s;}
 #edge-back-hint svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.2));}
 /* リスト・スワイプ操作 行 */
 .swipe-row{position:relative;overflow:hidden;}
@@ -773,11 +773,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- カレンダー -->
 <div id="screen-calendar" class="screen">
-  <div class="page-title">暦</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">カレンダー</div>
   <!-- サブタブ -->
-  <div style="display:flex;gap:6px;margin-bottom:12px;background:var(--paper2);padding:4px;border-radius:10px;">
-    <button id="cal-tab-cal"      onclick="showCalTab('cal')"      style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--matcha);color:#fff;">📅 カレンダー</button>
-    <button id="cal-tab-gantt"    onclick="showCalTab('gantt')"    style="flex:1;padding:8px 4px;font-size:12px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">📊 稼働表</button>
+  <div class="seg" style="display:flex;gap:3px;margin-bottom:14px;background:var(--paper2);padding:3px;border-radius:13px;">
+    <button id="cal-tab-cal"    onclick="showCalTab('cal')"    style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">カレンダー</button>
+    <button id="cal-tab-gantt"  onclick="showCalTab('gantt')"  style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">稼働表</button>
   </div>
   <!-- カレンダービュー -->
   <div id="cal-view-cal">
@@ -1146,7 +1146,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.23-AA</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.24-AE</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1813,7 +1813,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.23-AA</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.24-AE</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2281,7 +2281,10 @@ function showCalTab(tab){
     var v=document.getElementById('cal-view-'+t);
     var b=document.getElementById('cal-tab-'+t);
     if(v) v.style.display=t===tab?'':'none';
-    if(b){ b.style.background=t===tab?'var(--matcha)':'transparent'; b.style.color=t===tab?'#fff':'var(--muted)'; }
+    if(b){
+      if(t===tab){ b.style.background='var(--surface)'; b.style.color='var(--matcha)'; b.style.boxShadow='var(--shadow-sm)'; }
+      else { b.style.background='transparent'; b.style.color='var(--muted)'; b.style.boxShadow='none'; }
+    }
   });
   if(tab==='gantt')    renderGantt();
 }
@@ -3018,14 +3021,25 @@ function renderPartnerList(){
   var el=document.getElementById('partner-list'); if(!el) return;
   var list=partners.filter(function(p){return partnerFilter==='all'||p.type===partnerFilter;});
   if(!list.length){el.innerHTML='<div class="empty-state"><span class="empty-ico">🏪</span>取引先がありません</div>';initPartnerDrag();return;}
-  el.innerHTML='<div style="font-size:11px;color:var(--hint);margin-bottom:8px;padding-left:2px;">▲▼ で並び替え（≡ を長押し→ドラッグでもOK）</div>'+list.map(function(p){
+  var prodCount=list.filter(function(p){return p.type==='producer';}).length;
+  el.innerHTML='<div style="font-size:11px;color:var(--hint);margin-bottom:10px;padding-left:2px;">≡ を長押し→ドラッグ、または ▲▼ で並び替え</div>'
+    +'<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'
+    +list.map(function(p,i){
     var cnt=trades.filter(function(t){return t.producerId===p.id||t.buyerId===p.id;}).length;
-    var badge=p.type==='producer'?'<span class="badge badge-producer">生産家</span>':'<span class="badge badge-buyer">茶商</span>';
-    var arrows='<span style="display:inline-flex;flex-direction:column;gap:2px;margin-left:4px;">'
-      +'<button onclick="event.stopPropagation();movePartner('+p.id+',-1)" style="width:30px;height:22px;border:1px solid var(--border2);background:var(--surface);border-radius:6px;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:0;">▲</button>'
-      +'<button onclick="event.stopPropagation();movePartner('+p.id+',1)" style="width:30px;height:22px;border:1px solid var(--border2);background:var(--surface);border-radius:6px;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:0;">▼</button></span>';
-    return '<div class="partner-card" data-id="'+p.id+'" onclick="showPartnerDetail('+p.id+')" style="touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;flex:1;min-width:0;"><span style="color:var(--hint);font-size:17px;line-height:1;">≡</span><span style="overflow:hidden;text-overflow:ellipsis;">'+p.name+'</span></span><span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'+badge+arrows+'</span></div><div style="font-size:12px;color:var(--muted);padding-left:25px;">取引 '+cnt+'件'+(p.notes?' ｜ '+p.notes:'')+'</div></div>';
-  }).join('');
+    var isProd=p.type==='producer';
+    var av=p.name.replace(/[（(].*$/,'').slice(0,1);
+    var avColor=isProd?'background:var(--matcha-light);color:var(--matcha);':'background:var(--gold-light);color:var(--gold);';
+    var badge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:9px;'+(isProd?'background:var(--matcha-light);color:var(--matcha);':'background:var(--gold-light);color:var(--gold);')+'">'+(isProd?'生産家':'茶商')+'</span>';
+    var arrows='<span style="display:inline-flex;flex-direction:column;gap:2px;margin-left:2px;flex:none;">'
+      +'<button onclick="event.stopPropagation();movePartner('+p.id+',-1)" style="width:28px;height:20px;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--muted);font-size:10px;line-height:1;cursor:pointer;padding:0;">▲</button>'
+      +'<button onclick="event.stopPropagation();movePartner('+p.id+',1)" style="width:28px;height:20px;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--muted);font-size:10px;line-height:1;cursor:pointer;padding:0;">▼</button></span>';
+    return '<div class="partner-card" data-id="'+p.id+'" onclick="showPartnerDetail('+p.id+')" style="display:flex;align-items:center;gap:11px;padding:12px 14px;'+(i<list.length-1?'border-bottom:1px solid var(--border);':'')+'touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;background:var(--surface);">'
+      +'<span style="color:var(--hint);font-size:16px;line-height:1;flex:none;">≡</span>'
+      +'<span style="width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;'+avColor+'">'+av+'</span>'
+      +'<span style="flex:1;min-width:0;"><span style="font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+p.name+'</span>'
+      +'<span style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">取引'+cnt+'件'+(p.notes?' ・ '+p.notes:'')+'</span></span>'
+      +badge+arrows+'</div>';
+  }).join('')+'</div>';
   initPartnerDrag();
 }
 function renderPartnerSelects(){
@@ -6078,6 +6092,10 @@ function renderHome(){
     +_qa('<path d="M6 20V14M12 20V4M18 20v-6"/>','分析',"showScreen('analyze')")
     +'</div>';
 
+  /* ---- カレンダー（ミニ） ---- */
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
+  h+='<div id="home-cal"></div>';
+
   /* ---- 気づき（対処が必要なこと） ---- */
   var notes=[];
   // 未提出書類
@@ -6156,6 +6174,7 @@ function renderHome(){
   if(dm){ h+='<div class="section-label">今日のメモ</div>'+dm; }
 
   el.innerHTML=h;
+  try{ renderHomeCal(); }catch(e){}
 
   // 直近の取引の最後の行の下線を消す
   var rows=el.querySelector('.rows');
@@ -6168,6 +6187,58 @@ function renderHome(){
     if(w&&we) we.innerHTML=(w.icon||'')+'　'+(w.tMax!=null&&w.tMax!=='—'?'<span style="color:#e06c6c;font-weight:700;">'+Math.round(w.tMax)+'°</span> / <span style="color:#2980b9;">'+Math.round(w.tMin)+'°</span>':'')+(w.jmaPop!=null?'　☔'+w.jmaPop+'%':'');
   }).catch(function(){});
 }
+
+
+/* ===== ホームのミニカレンダー ===== */
+var _homeCalY=null,_homeCalM=null;
+function homeCalShift(d){
+  var base=(_homeCalY==null)?new Date():new Date(_homeCalY,_homeCalM,1);
+  base.setMonth(base.getMonth()+d);
+  _homeCalY=base.getFullYear(); _homeCalM=base.getMonth();
+  renderHomeCal();
+}
+function openCalOn(ds){
+  selectedDate=ds;
+  var dd=new Date(ds+'T00:00:00'); calYear=dd.getFullYear(); calMonth=dd.getMonth();
+  showScreen('calendar'); showCalTab('cal'); renderCalendar();
+  if(typeof fetchWeather==='function') try{ fetchWeather(ds); }catch(e){}
+}
+function renderHomeCal(){
+  var el=document.getElementById('home-cal'); if(!el) return;
+  var now=new Date();
+  if(_homeCalY==null){ _homeCalY=now.getFullYear(); _homeCalM=now.getMonth(); }
+  var y=_homeCalY,m=_homeCalM;
+  var today=todayStr();
+  var firstDay=new Date(y,m,1).getDay();
+  var dim=new Date(y,m+1,0).getDate();
+  var txByDate={}; trades.forEach(function(t){ if(t.date) txByDate[t.date]=1; });
+  var days=['日','月','火','水','木','金','土'];
+  var h='<div class="card" style="padding:14px 14px 10px;">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    +'<button onclick="homeCalShift(-1)" style="width:32px;height:32px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:15px;">‹</button>'
+    +'<span class="serif" style="font-size:16px;font-weight:700;">'+y+'年 '+(m+1)+'月</span>'
+    +'<button onclick="homeCalShift(1)" style="width:32px;height:32px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:15px;">›</button></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">';
+  h+=days.map(function(d,i){return '<div style="text-align:center;font-size:10px;font-weight:700;color:'+(i===0?'#c0392b':i===6?'#2980b9':'var(--hint)')+';padding:2px 0;">'+d+'</div>';}).join('');
+  for(var i=0;i<firstDay;i++) h+='<div></div>';
+  for(var d=1;d<=dim;d++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isToday=ds===today;
+    var hasTx=!!txByDate[ds];
+    var hasTeai=!!(teaiImages[ds]&&teaiImages[ds].length);
+    var hasMemo=!!(quickMemos[ds]&&quickMemos[ds].length);
+    var dots='';
+    if(hasTx) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--matcha);"></span>';
+    if(hasTeai) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--gold);"></span>';
+    if(hasMemo) dots+='<span style="width:5px;height:5px;border-radius:50%;background:#ff9800;"></span>';
+    h+='<div onclick="openCalOn(\''+ds+'\')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;'+(isToday?'background:var(--matcha);':'')+'">'
+      +'<span class="num" style="font-size:13px;font-weight:'+(isToday?'800':'600')+';color:'+(isToday?'#fff':'var(--ink)')+';">'+d+'</span>'
+      +'<span style="display:flex;gap:2px;height:5px;margin-top:2px;">'+(isToday?'':dots)+'</span></div>';
+  }
+  h+='</div></div>';
+  el.innerHTML=h;
+}
+
 function _hStat(v,l){
   return '<div style="flex:1;background:rgba(255,255,255,.14);border-radius:16px;padding:11px 6px;text-align:center;">'
     +'<div class="num" style="font-size:18px;font-weight:900;line-height:1.1;">'+v+'</div>'
@@ -6383,8 +6454,8 @@ function buildPartnerSummaryCard(p, myTrades){
     if(e.touches.length!==1) return;
     var t=e.touches[0];
     startX=t.clientX; startY=t.clientY; curX=startX; decided=false; horiz=false;
-    // 右方向スワイプ（戻る）はどこからでも開始可（iOS26方式）。ただし横スクロール領域内は除外
-    tracking=true;
+    // 戻る：画面の右端に指を置いて左へスワイプ。行スワイプ等との衝突を避けるため右端開始限定。
+    tracking = (startX > (window.innerWidth - 40));
   },{passive:true});
   document.addEventListener('touchmove',function(e){
     if(!tracking||e.touches.length!==1) return;
@@ -6392,8 +6463,8 @@ function buildPartnerSummaryCard(p, myTrades){
     var dx=curX-startX, dy=t.clientY-startY;
     if(!decided){
       if(Math.abs(dx)<10&&Math.abs(dy)<10) return;
-      // 横移動が縦より明確に大きい & 右向き
-      horiz = (dx>0 && Math.abs(dx)>Math.abs(dy)*1.6);
+      // 横移動が縦より明確に大きい & 左向き（右端から左へ）
+      horiz = (dx<0 && Math.abs(dx)>Math.abs(dy)*1.4);
       decided=true;
       // 横スクロール可能な祖先（稼働表など）がある場合は戻るを無効化
       if(horiz){
@@ -6406,14 +6477,14 @@ function buildPartnerSummaryCard(p, myTrades){
       if(horiz && canBack()) ensureHint();
     }
     if(horiz && canBack()){
-      var d=Math.max(0,Math.min(curX-startX,120));
+      var d=Math.max(0,Math.min(startX-curX,120));
       var h=ensureHint();
       h.style.width=d+'px'; h.style.opacity=(d/120);
     }
   },{passive:true});
   document.addEventListener('touchend',function(e){
     if(tracking && horiz && canBack()){
-      var d=curX-startX;
+      var d=startX-curX;
       var h=ensureHint();
       h.style.opacity='0'; h.style.width='0';
       if(d>72){ if(navigator.vibrate)navigator.vibrate(6); navBack(); }
