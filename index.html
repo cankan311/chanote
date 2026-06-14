@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.18-Q</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.18-R</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.18-Q</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.18-R</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -3904,6 +3904,7 @@ function openTeaiFull(id,date){
 /* ---- 分析 ---- */
 var analyzeYear = 'all';
 var analyzeSeason = 'all';
+var analyzeDay = 'all';
 var analyzeTab = 'summary'; // 'summary' | 'graph' | 'forecast'
 
 function showAnalyzeTab(tab){
@@ -3925,6 +3926,7 @@ function getAnalyzeYears(){
 }
 function getFilteredTrades(){
   return trades.filter(function(t){
+    if(analyzeDay !== 'all'){ return t.date === analyzeDay; }
     if(analyzeYear !== 'all' && (!t.date || t.date.slice(0,4) !== analyzeYear)) return false;
     if(analyzeSeason !== 'all' && t.season !== analyzeSeason) return false;
     return true;
@@ -3933,10 +3935,16 @@ function getFilteredTrades(){
 function onAnalyzeYearChange(val){
   analyzeYear = val;
   analyzeSeason = 'all';
+  analyzeDay = 'all';
   renderAnalyze();
 }
 function onAnalyzeSeasonChange(val){
   analyzeSeason = val;
+  analyzeDay = 'all';
+  renderAnalyze();
+}
+function onAnalyzeDayChange(val){
+  analyzeDay = val || 'all';
   renderAnalyze();
 }
 
@@ -4262,17 +4270,23 @@ function renderAnalyze(){
   getSeasonDefs().forEach(function(s){if(s.name&&!seenS[s.name]){seenS[s.name]=1;seasonNames.push(s.name);}});
   var seasonOpts = '<option value="all"'+(analyzeSeason==='all'?' selected':'')+'>全茶期</option>'
     + seasonNames.map(function(s){return '<option value="'+s+'"'+(analyzeSeason===s?' selected':'')+'>'+s+'</option>';}).join('');
+  var dayVal = analyzeDay!=='all' ? analyzeDay : '';
   var filterHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
     +'<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">📅 年度</label>'
     +'<select onchange="onAnalyzeYearChange(this.value)" style="width:100%;padding:9px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;appearance:auto;">'+yearOpts+'</select></div>'
     +'<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">🍵 茶期</label>'
     +'<select onchange="onAnalyzeSeasonChange(this.value)" style="width:100%;padding:9px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;appearance:auto;">'+seasonOpts+'</select></div>'
     +'</div>'
-    +(analyzeYear!=='all'||analyzeSeason!=='all'
+    +'<div style="margin-bottom:14px;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">🗓 日付（特定の1日で絞り込み）</label>'
+    +'<div style="display:flex;gap:8px;">'
+    +'<input type="date" value="'+dayVal+'" onchange="onAnalyzeDayChange(this.value)" style="flex:1;padding:9px 12px;font-size:14px;border:1.5px solid '+(analyzeDay!=='all'?'var(--matcha-mid)':'var(--border)')+';border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;">'
+    +(analyzeDay!=='all'?'<button onclick="onAnalyzeDayChange(\'\')" style="padding:0 14px;font-size:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:600;white-space:nowrap;">日付解除</button>':'')
+    +'</div></div>'
+    +(analyzeYear!=='all'||analyzeSeason!=='all'||analyzeDay!=='all'
       ? '<div style="background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:12px;color:var(--matcha);font-weight:600;display:flex;justify-content:space-between;align-items:center;">'
-        +'<span>🔍 '+(analyzeYear!=='all'?analyzeYear+'年 ':'')+(analyzeSeason!=='all'?analyzeSeason:'')+'のデータを表示中</span>'
-        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
+        +'<span>🔍 '+(analyzeDay!=='all'?analyzeDay+' の1日':((analyzeYear!=='all'?analyzeYear+'年 ':'')+(analyzeSeason!=='all'?analyzeSeason:'')))+'のデータを表示中</span>'
+        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';analyzeDay=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
         +'</div>'
       : '');
 
