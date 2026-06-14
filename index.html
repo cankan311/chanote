@@ -1100,7 +1100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid) !importan
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.18-R</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.18-S</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1729,7 +1729,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.18-R</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.18-S</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -3905,6 +3905,7 @@ function openTeaiFull(id,date){
 var analyzeYear = 'all';
 var analyzeSeason = 'all';
 var analyzeDay = 'all';
+var analyzeProducer = 'all';
 var analyzeTab = 'summary'; // 'summary' | 'graph' | 'forecast'
 
 function showAnalyzeTab(tab){
@@ -3926,6 +3927,7 @@ function getAnalyzeYears(){
 }
 function getFilteredTrades(){
   return trades.filter(function(t){
+    if(analyzeProducer !== 'all' && t.producerId !== parseInt(analyzeProducer)) return false;
     if(analyzeDay !== 'all'){ return t.date === analyzeDay; }
     if(analyzeYear !== 'all' && (!t.date || t.date.slice(0,4) !== analyzeYear)) return false;
     if(analyzeSeason !== 'all' && t.season !== analyzeSeason) return false;
@@ -3945,6 +3947,10 @@ function onAnalyzeSeasonChange(val){
 }
 function onAnalyzeDayChange(val){
   analyzeDay = val || 'all';
+  renderAnalyze();
+}
+function onAnalyzeProducerChange(val){
+  analyzeProducer = val || 'all';
   renderAnalyze();
 }
 
@@ -4002,12 +4008,7 @@ function renderAnalyze(){
       return aHas-bHas;
     });
     var defaultPid = sortedProducers.length ? sortedProducers[0].id : '';
-    producerSelectHtml='<select id="analyze-producer-select" onchange="renderProducerCharts()" style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;margin-bottom:0;">'
-      +sortedProducers.map(function(p){
-        var hasData=activeProducerIds[p.id]?'':' style="color:var(--muted);"';
-        return '<option value="'+p.id+'"'+(p.id===defaultPid?' selected':'')+hasData+'>'+p.name+(activeProducerIds[p.id]?'':'（データなし）')+'</option>';
-      }).join('')
-      +'</select>';
+    producerSelectHtml=''; // 生産家切替はタブ全体のフィルターに統合
   }
 
   // セクションHTML生成
@@ -4270,6 +4271,12 @@ function renderAnalyze(){
   getSeasonDefs().forEach(function(s){if(s.name&&!seenS[s.name]){seenS[s.name]=1;seasonNames.push(s.name);}});
   var seasonOpts = '<option value="all"'+(analyzeSeason==='all'?' selected':'')+'>全茶期</option>'
     + seasonNames.map(function(s){return '<option value="'+s+'"'+(analyzeSeason===s?' selected':'')+'>'+s+'</option>';}).join('');
+  // 生産家フィルター用の選択肢（取引のある生産家を上に）
+  var _prods = partners.filter(function(p){return p.type==='producer';});
+  var _hasData={}; trades.forEach(function(t){ if(t.producerId) _hasData[t.producerId]=1; });
+  var _sortedP=_prods.slice().sort(function(a,b){ return (_hasData[a.id]?0:1)-(_hasData[b.id]?0:1); });
+  var producerFilterOpts='<option value="all"'+(analyzeProducer==='all'?' selected':'')+'>全生産家</option>'
+    + _sortedP.map(function(p){ return '<option value="'+p.id+'"'+(String(analyzeProducer)===String(p.id)?' selected':'')+'>'+p.name+(_hasData[p.id]?'':'（データなし）')+'</option>'; }).join('');
   var dayVal = analyzeDay!=='all' ? analyzeDay : '';
   var filterHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
@@ -4283,10 +4290,15 @@ function renderAnalyze(){
     +'<input type="date" value="'+dayVal+'" onchange="onAnalyzeDayChange(this.value)" style="flex:1;padding:9px 12px;font-size:14px;border:1.5px solid '+(analyzeDay!=='all'?'var(--matcha-mid)':'var(--border)')+';border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;">'
     +(analyzeDay!=='all'?'<button onclick="onAnalyzeDayChange(\'\')" style="padding:0 14px;font-size:12px;border-radius:var(--radius-sm);border:1.5px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;font-weight:600;white-space:nowrap;">日付解除</button>':'')
     +'</div></div>'
-    +(analyzeYear!=='all'||analyzeSeason!=='all'||analyzeDay!=='all'
+    +'<div style="margin-bottom:14px;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">🌿 生産家（特定の生産家で絞り込み）</label>'
+    +'<select onchange="onAnalyzeProducerChange(this.value)" style="width:100%;padding:9px 12px;font-size:14px;border:1.5px solid '+(analyzeProducer!=='all'?'var(--matcha-mid)':'var(--border)')+';border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;appearance:auto;">'+producerFilterOpts+'</select></div>'
+    +(analyzeYear!=='all'||analyzeSeason!=='all'||analyzeDay!=='all'||analyzeProducer!=='all'
       ? '<div style="background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:12px;color:var(--matcha);font-weight:600;display:flex;justify-content:space-between;align-items:center;">'
-        +'<span>🔍 '+(analyzeDay!=='all'?analyzeDay+' の1日':((analyzeYear!=='all'?analyzeYear+'年 ':'')+(analyzeSeason!=='all'?analyzeSeason:'')))+'のデータを表示中</span>'
-        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';analyzeDay=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
+        +'<span>🔍 '
+          +(analyzeProducer!=='all'?((partners.find(function(p){return String(p.id)===String(analyzeProducer);})||{}).name||'')+' ':'')
+          +(analyzeDay!=='all'?analyzeDay+' の1日':((analyzeYear!=='all'?analyzeYear+'年 ':'')+(analyzeSeason!=='all'?analyzeSeason:'')))
+          +'のデータを表示中</span>'
+        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';analyzeDay=\'all\';analyzeProducer=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
         +'</div>'
       : '');
 
@@ -4754,8 +4766,7 @@ var _priceChartInstance = null;
 var _qtyChartInstance   = null;
 
 function renderProducerCharts(){
-  var sel=document.getElementById('analyze-producer-select');
-  if(sel) renderProducerChartsEc();
+  renderProducerChartsEc();
 }
 
 function resetPriceZoom(){ ecResetZoom('producer-price-chart'); }
@@ -5705,10 +5716,16 @@ function renderOverviewCharts(){
 /* ===== 生産家別グラフ（ECharts） ===== */
 function renderProducerChartsEc(){
   if(typeof echarts==='undefined') return;
-  var sel=document.getElementById('analyze-producer-select');
-  if(!sel) return;
-  var pid=parseInt(sel.value);
-  var pTrades=getFilteredTrades().filter(function(t){return t.producerId===pid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+  // タブ全体のフィルターに従う。生産家未指定なら、データのある先頭の生産家を表示。
+  var ft=getFilteredTrades();
+  var pid;
+  if(analyzeProducer!=='all'){ pid=parseInt(analyzeProducer); }
+  else {
+    var counts={}; ft.forEach(function(t){ if(t.producerId) counts[t.producerId]=(counts[t.producerId]||0)+1; });
+    var best=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];})[0];
+    pid=best?parseInt(best):null;
+  }
+  var pTrades=ft.filter(function(t){return t.producerId===pid;}).sort(function(a,b){return a.date.localeCompare(b.date);});
 
   var pc=ecInit('producer-price-chart');
   var qc=ecInit('producer-qty-chart');
