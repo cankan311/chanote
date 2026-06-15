@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.30-AV</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.01-AW</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.30-AV</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.01-AW</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -6815,6 +6815,7 @@ function _inputDialog(opts){
     +'<div style="width:40px;height:5px;border-radius:3px;background:var(--border2);margin:0 auto 14px;"></div>'
     +'<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;white-space:pre-wrap;line-height:1.5;">'+escText(opts.title||'')+'</div>'
     +field
+    +(opts.extraBtn?'<button id="idlg-extra" style="width:100%;margin-top:10px;padding:11px;border-radius:12px;border:1px solid #1a73e8;background:#fff;color:#1a73e8;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">'+escText(opts.extraBtn.label)+'</button>':'')
     +'<div style="display:flex;gap:8px;margin-top:14px;">'
     +(opts.allowDelete?'<button id="idlg-del" style="padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--red);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">削除</button>':'')
     +'<button id="idlg-cancel" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">キャンセル</button>'
@@ -6827,6 +6828,7 @@ function _inputDialog(opts){
   document.getElementById('idlg-ok').onclick=function(){ var v=inp.value; ov.remove(); if(opts.onOk) opts.onOk(v); };
   document.getElementById('idlg-cancel').onclick=function(){ ov.remove(); };
   var del=document.getElementById('idlg-del'); if(del) del.onclick=function(){ ov.remove(); if(opts.onDelete) opts.onDelete(); };
+  var ex=document.getElementById('idlg-extra'); if(ex) ex.onclick=function(e){ e.stopPropagation(); if(opts.extraBtn&&opts.extraBtn.onClick) opts.extraBtn.onClick(); };
 }
 
 /* ===== 見本回り（ペア記憶＋キタハイ一括） ===== */
@@ -7039,7 +7041,9 @@ function editHomeAddr(){
 }
 function setSamplePlace(key){
   var nd=_resolveNode(key); if(!nd) return;
-  _inputDialog({title:nd.name+' の場所を登録\n・住所、または「緯度,経度」（例：34.836,138.176）が最も正確\n・Googleマップでピンを長押し→座標をコピーして貼り付け',value:nd.place||'',placeholder:'住所 または 緯度,経度',okText:'登録',onOk:function(v){
+  _inputDialog({title:nd.name+' の場所を登録\n①下の「Googleマップで探す」で地図を開く\n②ピンを長押し→座標をコピー\n③ここに戻って貼り付け→登録',value:nd.place||'',placeholder:'住所 または 緯度,経度',okText:'登録',
+    extraBtn:{label:'🗺 Googleマップで探す',onClick:function(){ var q=encodeURIComponent(nd.name.replace(/（[^）]*）/g,'')+' 静岡県島田市'); window.open('https://www.google.com/maps/search/?api=1&query='+q,'_blank'); }},
+    onOk:function(v){
     v=(v||'').trim();
     if(key==='kitahai'){ setKitahaiPlace(v); }
     else if(String(key).indexOf('spot_')===0){ loadSampleSpots(); var sp=sampleSpots.find(function(x){return x.id===key;}); if(sp){ sp.place=v; saveSampleSpots(); } }
