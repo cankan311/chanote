@@ -633,6 +633,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 <div id="more-sheet" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:1501;background:var(--surface);border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,0.22);padding:10px 18px calc(22px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .26s cubic-bezier(.22,1,.36,1);">
   <div style="width:40px;height:5px;border-radius:3px;background:var(--border2);margin:8px auto 16px;"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+    <button class="more-item" onclick="moreGo('sample')" id="more-sample"><span class="mi-ico">🚗</span>見本</button>
     <button class="more-item" onclick="moreGo('partners')" id="more-partners"><span class="mi-ico">👥</span>取引先</button>
     <button class="more-item" onclick="moreGo('market')" id="more-market"><span class="mi-ico">📣</span>市場・情報</button>
     <button class="more-item" onclick="moreGo('order')" id="more-order"><span class="mi-ico">📋</span>注文</button>
@@ -1085,6 +1086,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 </div>
 
 <!-- 設定 -->
+<div id="screen-sample" class="screen">
+  <div id="sample-content"></div>
+</div>
+
 <div id="screen-settings" class="screen">
   <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">設定</div>
   <div class="section-label">🎨 テーマ</div>
@@ -1145,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.24-AI</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.28-AR</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1212,7 +1217,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 </div><!-- /#app -->
 
 <!-- フローティングメモボタン -->
-<button id="fab-memo" onclick="openMemoModal()" style="position:fixed;right:18px;bottom:calc(120px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#ff9800,#f57c00);color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 16px rgba(255,152,0,0.45);z-index:800;display:flex;align-items:center;justify-content:center;transition:transform .15s;">📝</button>
+<!-- 統合フローティングボタン：長押し→上で記録 / 左でメモ -->
+<div id="fab-hint-up" style="position:fixed;right:30px;bottom:calc(196px + env(safe-area-inset-bottom));z-index:799;display:none;flex-direction:column;align-items:center;gap:3px;color:#fff;font-size:11px;font-weight:800;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;">
+  <div style="width:48px;height:48px;border-radius:50%;background:#34684a;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(52,104,74,.5);font-size:22px;">✏️</div><span style="background:rgba(0,0,0,.6);padding:2px 8px;border-radius:8px;">記録</span>
+</div>
+<div id="fab-hint-left" style="position:fixed;right:92px;bottom:calc(126px + env(safe-area-inset-bottom));z-index:799;display:none;flex-direction:column;align-items:center;gap:3px;color:#fff;font-size:11px;font-weight:800;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;">
+  <div style="width:48px;height:48px;border-radius:50%;background:#f57c00;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(245,124,0,.5);font-size:22px;">📝</div><span style="background:rgba(0,0,0,.6);padding:2px 8px;border-radius:8px;">メモ</span>
+</div>
+<button id="fab-memo" style="position:fixed;right:18px;bottom:calc(122px + env(safe-area-inset-bottom));width:48px;height:48px;border-radius:50%;background:rgba(52,104,74,0.18);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(52,104,74,0.15);z-index:800;display:flex;align-items:center;justify-content:center;transition:transform .15s,background .15s,opacity .15s,color .15s;touch-action:none;opacity:0.55;">＋</button>
 
 <!-- メモモーダル -->
 <div id="memo-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:2000;align-items:flex-end;">
@@ -1600,7 +1612,7 @@ function toast(msg){
 }
 
 var PRIMARY_TABS=['home','trades','calendar','analyze'];
-var MORE_SCREENS=['partners','market','order','docs','new-trade','settings'];
+var MORE_SCREENS=['sample','partners','market','order','docs','new-trade','settings'];
 function _setActiveTab(name){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   if(PRIMARY_TABS.indexOf(name)>=0){ var tb=document.getElementById('tab-'+name); if(tb) tb.classList.add('active'); }
@@ -1639,6 +1651,7 @@ function showScreen(name, isBack){
   if(name==='home') renderHome();
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
+  if(name==='sample') renderSample();
   if(name==='order') renderOrder();
   if(name==='market'){ initMarketPreviews(); try{ renderSoubaBoard(); }catch(e){} }
   if(name==='settings'){ notionLoadSettings(); gsLoadSettings(); renderThemeButtons();
@@ -1812,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.24-AI</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.28-AR</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -3628,6 +3641,7 @@ function renderCalendar(){
       });
     });
     var inner='';
+    inner+=renderSampleRoundForDate(selectedDate);
     if(rows) inner+='<div class="section-label">'+selectedDate+' の取引</div>'+rows;
     inner+=renderDayMemos(selectedDate);
     txListEl.innerHTML=inner;
@@ -3636,6 +3650,25 @@ function renderCalendar(){
   }
   renderCalTeai();
 }
+
+
+function renderSampleRoundForDate(date){
+  loadSampleRounds();
+  var r=sampleRounds[date]; if(!r||!r.stops||!r.stops.length) return '';
+  var h='<div class="section-label">🚗 見本回りの記録</div>';
+  h+='<div class="card pad" style="margin-bottom:10px;">';
+  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">'+(r.departTime?'🚗 出発 '+r.departTime:'')+(r.arriveTarget?' → '+r.arriveTarget+' 到着目標':'')+(r.start?' ・ '+escText(r.start)+' から':'')+'</div>';
+  r.stops.forEach(function(st,i){
+    var isP=st.type==='p';
+    h+='<div style="display:flex;align-items:center;gap:9px;padding:5px 0;">'
+      +'<span style="width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;">'+(i+1)+'</span>'
+      +'<span style="font-size:13px;font-weight:600;flex:1;">'+escText(st.name)+'</span>'
+      +'<span style="font-size:10px;font-weight:700;color:'+(isP?'var(--matcha)':'var(--gold)')+';">'+(isP?'見本':'配達')+'</span></div>';
+  });
+  h+='</div>';
+  return h;
+}
+
 function selDate(ds){
   selectedDate=(selectedDate===ds)?null:ds;
   renderCalendar();
@@ -6609,9 +6642,339 @@ function refreshCurrentScreen(){
   else if(n==='calendar'){ renderCalendar(); renderCalTeai(); }
   else if(n==='partners') renderPartnerList();
   else if(n==='market'){ initMarketPreviews(); try{renderSoubaBoard();}catch(e){} }
+  else if(n==='sample') renderSample();
   else if(n==='order') renderOrder();
   else if(n==='docs') renderDocsScreen();
 }
+
+
+/* ===== 統合フローティングボタン（長押し→上=記録 / 左=メモ / タップ=メニュー） ===== */
+(function(){
+  var btn=document.getElementById('fab-memo'); if(!btn) return;
+  var up=document.getElementById('fab-hint-up'), left=document.getElementById('fab-hint-left');
+  var sx=0,sy=0,active=false,dir=null,moved=false,holdT=null,armed=false;
+  function showHints(on){
+    [up,left].forEach(function(el){ el.style.display=on?'flex':'none'; requestAnimationFrame(function(){ el.style.opacity=on?'1':'0'; el.style.transform=on?'translateY(0)':'translateY(6px)'; }); });
+  }
+  function highlight(d){
+    up.style.transform=d==='up'?'translateY(-4px) scale(1.12)':'translateY(0) scale(1)';
+    left.style.transform=d==='left'?'translateX(-4px) scale(1.12)':'translateX(0) scale(1)';
+  }
+  function reset(){ active=false;dir=null;moved=false;armed=false; clearTimeout(holdT); showHints(false); btn.style.transform=''; btn.style.opacity='0.55'; btn.style.background='rgba(52,104,74,0.18)'; btn.style.color='rgba(255,255,255,0.85)'; btn.textContent='＋'; }
+  btn.addEventListener('touchstart',function(e){
+    if(e.touches.length!==1)return;
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY; active=true; moved=false; dir=null; armed=false;
+    btn.style.transform='scale(1.1)'; btn.style.opacity='1'; btn.style.background='rgba(52,104,74,0.96)'; btn.style.color='#fff';
+    holdT=setTimeout(function(){ armed=true; if(navigator.vibrate)navigator.vibrate(10); showHints(true); btn.textContent='↑'; },180);
+  },{passive:true});
+  btn.addEventListener('touchmove',function(e){
+    if(!active)return;
+    var dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
+    if(Math.abs(dx)>6||Math.abs(dy)>6) moved=true;
+    if(!armed && (Math.abs(dx)>14||Math.abs(dy)>14)){ armed=true; clearTimeout(holdT); showHints(true); }
+    if(!armed)return;
+    // 方向判定：上 or 左（上方向を優先、左方向）
+    if(dy<-22 && Math.abs(dy)>=Math.abs(dx)){ dir='up'; }
+    else if(dx<-22 && Math.abs(dx)>Math.abs(dy)){ dir='left'; }
+    else { dir=null; }
+    highlight(dir);
+    btn.textContent = dir==='up'?'✏️':dir==='left'?'📝':'↑';
+  },{passive:true});
+  btn.addEventListener('touchend',function(e){
+    if(!active){reset();return;}
+    clearTimeout(holdT);
+    var fired=dir;
+    showHints(false); btn.style.transform=''; btn.style.opacity='0.55'; btn.style.background='rgba(52,104,74,0.18)'; btn.style.color='rgba(255,255,255,0.85)'; btn.textContent='＋';
+    active=false;
+    if(fired==='up'){ if(navigator.vibrate)navigator.vibrate(6); showScreen('new-trade'); }
+    else if(fired==='left'){ if(navigator.vibrate)navigator.vibrate(6); openMemoModal(); }
+    else if(!moved){ /* タップ：メニューを開く */ openFabMenu(); }
+    dir=null;
+  },{passive:true});
+  btn.addEventListener('touchcancel',reset,{passive:true});
+})();
+function openFabMenu(){
+  // タップ時はミニメニュー（記録/メモ）を表示
+  if(document.getElementById('fab-menu')){ closeFabMenu(); return; }
+  var ov=document.createElement('div'); ov.id='fab-menu'; ov.onclick=closeFabMenu;
+  ov.style.cssText='position:fixed;inset:0;z-index:850;';
+  ov.innerHTML='<div style="position:fixed;right:18px;bottom:calc(186px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;align-items:flex-end;">'
+    +'<button onclick="event.stopPropagation();closeFabMenu();showScreen(\'new-trade\')" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#34684a;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(52,104,74,.4);">✏️ 取引を記録</button>'
+    +'<button onclick="event.stopPropagation();closeFabMenu();openMemoModal()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#f57c00;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(245,124,0,.4);">📝 メモ</button></div>';
+  document.body.appendChild(ov);
+}
+function closeFabMenu(){ var m=document.getElementById('fab-menu'); if(m) m.remove(); }
+
+
+/* ===== 見本回り（ペア記憶＋キタハイ一括） ===== */
+var sampleRounds={};
+var sampleLegs={};   // ペアごとの移動時間 { "a__b": 分 }
+function loadSampleRounds(){ try{ sampleRounds=JSON.parse(_safeLS.getItem('ocha_sample_rounds')||'{}'); }catch(e){ sampleRounds={}; } }
+function saveSampleRounds(){ try{ _safeLS.setItem('ocha_sample_rounds', JSON.stringify(sampleRounds)); }catch(e){} }
+function loadSampleLegs(){ try{ sampleLegs=JSON.parse(_safeLS.getItem('ocha_sample_legs')||'{}'); }catch(e){ sampleLegs={}; } }
+function saveSampleLegs(){ try{ _safeLS.setItem('ocha_sample_legs', JSON.stringify(sampleLegs)); }catch(e){} }
+function getStartPlace(){ try{ return _safeLS.getItem('ocha_sample_start')||''; }catch(e){ return ''; } }
+function setStartPlace(v){ try{ _safeLS.setItem('ocha_sample_start', v||''); }catch(e){} }
+function kitahaiPlace(){ try{ return _safeLS.getItem('ocha_sample_kitahai_place')||''; }catch(e){ return ''; } }
+function setKitahaiPlace(v){ try{ _safeLS.setItem('ocha_sample_kitahai_place', v||''); }catch(e){} }
+
+function _isKitahai(p){ return p.type==='producer' && (typeof docCanonName==='function') && docCanonName(p.name)==='キタハイ'; }
+function _resolveNode(key){
+  if(key==='kitahai') return {key:'kitahai',name:'キタハイ（茶業センター一括）',type:'p',place:kitahaiPlace()};
+  var p=partners.find(function(x){return String(x.id)===String(key);});
+  if(!p) return null;
+  return {key:String(p.id),name:p.name,type:(p.type==='producer'?'p':'c'),place:p.place||'',partner:p};
+}
+function pairKey(a,b){ return [String(a),String(b)].sort().join('__'); }
+function getLeg(a,b){ var v=sampleLegs[pairKey(a,b)]; return (v==null||v==='')?null:v; }
+function setLegVal(a,b,v){ loadSampleLegs(); if(v===''||v==null){ delete sampleLegs[pairKey(a,b)]; } else { sampleLegs[pairKey(a,b)]=Math.max(0,parseInt(v)||0); } saveSampleLegs(); }
+var sampleDwellMap={};
+function loadSampleDwell(){ try{ sampleDwellMap=JSON.parse(_safeLS.getItem('ocha_sample_dwell')||'{}'); }catch(e){ sampleDwellMap={}; } }
+function getDwell(key){ var v=sampleDwellMap[key]; return (v==null||v==='')?1:v; }
+function setDwellVal(key,v){ loadSampleDwell(); sampleDwellMap[key]=Math.max(0,parseInt(v)||0); try{ _safeLS.setItem('ocha_sample_dwell', JSON.stringify(sampleDwellMap)); }catch(e){} }
+function homeAddr(){ return getStartPlace(); }
+function setHomeAddr(v){ setStartPlace(v); }
+
+var _sampleStep=1;
+var _sampleSel={ producers:{}, chashos:{} };  // key -> true（producersは pid または 'kitahai'）
+var _sampleOrder=[];   // [{type:'p'|'c', key}]
+var _sampleStart='';
+
+function renderSample(){
+  loadSampleRounds(); loadSampleLegs(); loadSampleDwell();
+  var el=document.getElementById('sample-content'); if(!el) return;
+  el.innerHTML = _sampleStep===1 ? _sampleStep1() : _sampleStep2();
+  if(_sampleStep===2) setTimeout(function(){ initSampleDrag(); try{computeSampleTimes();}catch(e){} },0);
+}
+
+function _sampleStep1(){
+  var prods=partners.filter(function(p){return p.type==='producer';});
+  var kita=prods.filter(_isKitahai);
+  var nonKita=prods.filter(function(p){return !_isKitahai(p);});
+  var chashos=partners.filter(function(p){return p.type==='chasho';});
+  function row(key,name,grp,sub){
+    var on=_sampleSel[grp][key];
+    var av=name.replace(/[（(].*$/,'').slice(0,1);
+    var avc=grp==='producers'?'background:var(--matcha-light);color:var(--matcha);':'background:var(--gold-light);color:var(--gold);';
+    return '<div onclick="toggleSampleSel(\''+grp+'\',\''+key+'\')" style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;">'
+      +'<span style="width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;'+avc+'">'+av+'</span>'
+      +'<span style="flex:1;min-width:0;"><span style="font-size:15px;font-weight:600;'+(on?'':'color:var(--muted);')+'display:block;">'+name+'</span>'+(sub?'<span style="font-size:10px;color:var(--hint);">'+sub+'</span>':'')+'</span>'
+      +'<span style="width:26px;height:26px;border-radius:8px;border:2px solid '+(on?'var(--matcha)':'var(--border2)')+';background:'+(on?'var(--matcha)':'transparent')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;flex:none;">'+(on?'✓':'')+'</span></div>';
+  }
+  var pHtml='';
+  nonKita.forEach(function(p){ pHtml+=row(String(p.id),p.name,'producers'); });
+  if(kita.length) pHtml+=row('kitahai','キタハイ（茶業センター一括）','producers',kita.length+'軒分をまとめて受け取り');
+  var pCount=Object.keys(_sampleSel.producers).filter(function(k){return _sampleSel.producers[k];}).length;
+  var cCount=Object.keys(_sampleSel.chashos).filter(function(k){return _sampleSel.chashos[k];}).length;
+
+  var h='<div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">見本回り</div>';
+  h+='<div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:16px;">今日まわる<b>生産家（見本を取る先）</b>と、配る<b>茶商（届ける先）</b>を選んでください。（キタハイ）はセンターで一括受け取りとして1つにまとまっています。</div>';
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>🌿 見本を取る生産家</span><span style="color:var(--matcha);">'+pCount+'件</span></div>';
+  h+='<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'+pHtml+'</div>';
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>🏪 配る茶商</span><span style="color:var(--gold);">'+cCount+'件</span></div>';
+  h+='<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'+chashos.map(function(p){return row(String(p.id),p.name,'chashos');}).join('')+'</div>';
+  h+='<button onclick="sampleGoStep2()" style="width:100%;margin-top:20px;padding:15px;border-radius:16px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(52,104,74,.3);">順番を決める ('+(pCount+cCount)+'件) ›</button>';
+  return h;
+}
+function toggleSampleSel(grp,key){
+  _sampleSel[grp][key]=!_sampleSel[grp][key];
+  document.getElementById('sample-content').innerHTML=_sampleStep1();
+}
+function sampleGoStep2(){
+  var order=[];
+  var kitaAdded=false;
+  partners.forEach(function(p){
+    if(p.type!=='producer') return;
+    if(_isKitahai(p)){ if(_sampleSel.producers['kitahai']&&!kitaAdded){ order.push({type:'p',key:'kitahai'}); kitaAdded=true; } }
+    else if(_sampleSel.producers[String(p.id)]) order.push({type:'p',key:String(p.id)});
+  });
+  partners.forEach(function(p){ if(p.type==='chasho'&&_sampleSel.chashos[String(p.id)]) order.push({type:'c',key:String(p.id)}); });
+  if(!order.length){ toast('まわる先を選んでください'); return; }
+  _sampleOrder=order; _sampleStart=getStartPlace(); _sampleStep=2; renderSample();
+}
+
+function _sampleStep2(){
+  var d=_sampleDate();
+  if(window._sampleArrive==null) window._sampleArrive='07:00';
+  if(window._sampleDwell==null) window._sampleDwell=3;
+  var h='<div style="display:flex;align-items:center;gap:8px;padding-top:calc(env(safe-area-inset-top) + 6px);margin-bottom:10px;">'
+    +'<button onclick="_sampleStep=1;renderSample();" style="display:inline-flex;align-items:center;gap:5px;color:var(--matcha);font-weight:700;font-size:15px;background:none;border:none;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>選び直す</button>'
+    +'<span class="page-title" style="margin:0;font-size:24px;">回る順番</span></div>';
+  var home=getStartPlace();
+  h+='<div class="card pad" style="margin-bottom:12px;">'
+    +'<div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;margin-bottom:8px;">到着目標から逆算</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
+    +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);">日付</label><input type="date" id="sample-date" value="'+d+'" style="width:100%;padding:9px;font-size:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></div>'
+    +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);">最終到着の目標</label><input type="time" id="sample-arrive" value="'+window._sampleArrive+'" style="width:100%;padding:9px;font-size:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;">'
+    +'<span style="font-size:11px;color:var(--muted);white-space:nowrap;">🏠 出発地（自宅）</span>'
+    +'<span style="flex:1;font-size:13px;font-weight:600;color:'+(home?'var(--ink)':'var(--red)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(home?escText(home):'未登録')+'</span>'
+    +'<button onclick="editHomeAddr()" style="font-size:11px;border:1px solid var(--border);background:var(--surface);color:var(--matcha);font-weight:700;border-radius:10px;padding:5px 11px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">'+(home?'変更':'登録')+'</button>'
+    +'</div></div>';
+  h+='<div id="sample-result" style="margin-bottom:12px;"></div>';
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;"><span>訪問順・各区間の移動時間</span><button onclick="computeSampleTimes()" style="font-size:11px;border:1px solid var(--matcha);background:var(--matcha-light);color:var(--matcha);font-weight:800;border-radius:12px;padding:5px 12px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">⟳ 出発時刻を計算</button></div>';
+  h+='<div style="font-size:10px;color:var(--hint);margin:0 2px 8px;">移動時間は<b>地点の組み合わせ</b>で記憶されます。一度入れれば順番を変えても自動で当てはまります。</div>';
+  h+='<div class="rows" id="sample-route" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">';
+  _sampleOrder.forEach(function(it,i){
+    var nd=_resolveNode(it.key); if(!nd) return;
+    var isP=it.type==='p';
+    var prevKey=(i===0)?'START':_sampleOrder[i-1].key;
+    var legVal=getLeg(prevKey,it.key);
+    var av=nd.name.replace(/[（(].*$/,'').slice(0,1);
+    var avc=isP?'background:var(--matcha-light);color:var(--matcha);':'background:var(--gold-light);color:var(--gold);';
+    h+='<div class="sample-stop" data-idx="'+i+'" style="display:flex;align-items:center;gap:10px;padding:11px 12px;'+(i<_sampleOrder.length-1?'border-bottom:1px solid var(--border);':'')+'background:var(--surface);">'
+      +'<span style="color:var(--hint);font-size:15px;flex:none;">≡</span>'
+      +'<span style="width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;" class="num">'+(i+1)+'</span>'
+      +'<span style="width:32px;height:32px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;'+avc+'">'+av+'</span>'
+      +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nd.name+'<span style="font-size:10px;font-weight:600;color:'+(isP?'var(--matcha)':'var(--gold)')+';margin-left:5px;">'+(isP?'見本':'配達')+'</span></span>'
+      +'<span onclick="setSamplePlace(\''+it.key+'\')" style="font-size:11px;color:'+(nd.place?'var(--muted)':'var(--red)')+';cursor:pointer;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(nd.place?'📍 '+escText(nd.place):'📍 場所を登録')+'</span>'
+      +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span></span>'
+      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:52px;"><span style="font-size:9px;color:var(--hint);">'+(i===0?'自宅→':'移動')+'分</span>'
+      +'<input type="number" inputmode="numeric" value="'+(legVal!=null?legVal:'')+'" onchange="setLegVal(\''+prevKey+'\',\''+it.key+'\',this.value);computeSampleTimes();" placeholder="分" style="width:48px;padding:6px 3px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
+      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:46px;"><span style="font-size:9px;color:var(--hint);">滞在分</span>'
+      +'<input type="number" inputmode="numeric" value="'+getDwell(it.key)+'" onchange="setDwellVal(\''+it.key+'\',this.value);computeSampleTimes();" style="width:44px;padding:6px 3px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
+      +'</div>';
+  });
+  h+='</div>';
+  h+='<button onclick="openSampleMap()" style="width:100%;margin-top:18px;padding:15px;border-radius:16px;border:none;background:#1a73e8;color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(26,115,232,.3);">🗺 Googleマップでルートを開く</button>';
+  h+='<div style="font-size:11px;color:var(--hint);text-align:center;margin-top:6px;line-height:1.6;">開いたGoogleマップで出発時刻を翌朝に設定すると、その時刻の予測で所要時間が出ます。早朝は渋滞の影響が小さいので目安になります。</div>';
+  h+='<button onclick="saveSampleRound()" style="width:100%;margin-top:12px;padding:14px;border-radius:16px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">💾 この回り方を記録（カレンダーに残す）</button>';
+  return h;
+}
+function _hm(mins){ mins=Math.round(mins); mins=((mins%1440)+1440)%1440; var h=Math.floor(mins/60),m=mins%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function _toMin(hhmm){ if(!hhmm)return null; var a=hhmm.split(':'); return parseInt(a[0])*60+parseInt(a[1]); }
+function computeSampleTimes(){
+  var arrEl=document.getElementById('sample-arrive');
+  if(arrEl) window._sampleArrive=arrEl.value;
+  var target=_toMin(window._sampleArrive);
+  loadSampleLegs(); loadSampleDwell();
+  var legs=_sampleOrder.map(function(it,i){ var prev=(i===0)?'START':_sampleOrder[i-1].key; return getLeg(prev,it.key); });
+  var dwells=_sampleOrder.map(function(it){ return getDwell(it.key); });
+  var missing=legs.some(function(v){return v==null;});
+  var totalLeg=legs.reduce(function(a,b){return a+(b||0);},0);
+  // 滞在は最後の地点ぶんを除いて加算（到着後は計算不要）
+  var totalDwell=0; for(var k=0;k<dwells.length-1;k++) totalDwell+=(dwells[k]||0);
+  var start=(target!=null)?target-(totalLeg+totalDwell):null;
+  var cur=start, times=[];
+  for(var i=0;i<_sampleOrder.length;i++){ cur+=(legs[i]||0); var arrive=cur; var depart=arrive+(i<_sampleOrder.length-1?(dwells[i]||0):0); times.push({arrive:arrive,depart:depart}); cur=depart; }
+  for(var j=0;j<_sampleOrder.length;j++){ var el=document.getElementById('sample-time-'+j); if(el&&start!=null){ el.textContent='着 '+_hm(times[j].arrive)+(j<_sampleOrder.length-1?' / 発 '+_hm(times[j].depart):' 〔到着〕'); } }
+  var res=document.getElementById('sample-result');
+  if(res&&start!=null){
+    res.innerHTML='<div style="background:linear-gradient(135deg,#3f6b4e,#2c533c);color:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 8px 20px rgba(44,83,60,.3);">'
+      +'<div style="font-size:12px;opacity:.9;">この順番なら出発は</div>'
+      +'<div class="serif num" style="font-size:34px;font-weight:700;line-height:1.1;margin-top:2px;">🚗 '+_hm(start)+'</div>'
+      +'<div style="font-size:11px;opacity:.85;margin-top:4px;">'+window._sampleArrive+' に最終到着 ・ 移動計'+totalLeg+'分＋滞在計'+totalDwell+'分'+(missing?'<br>⚠️ 未入力の移動時間があります（0分として計算）':'')+'</div></div>';
+  }
+}
+function _sampleDate(){ var el=document.getElementById('sample-date'); return el?el.value:todayStr(); }
+function editHomeAddr(){
+  var cur=getStartPlace();
+  var v=prompt('出発地（自宅）の住所、またはGoogleマップのリンク/地名を入力してください：\n※一度登録すれば次回から自動で使われます', cur);
+  if(v===null) return; setStartPlace(v.trim()); renderSample();
+}
+function setSamplePlace(key){
+  var nd=_resolveNode(key); if(!nd) return;
+  var v=prompt(nd.name+' の場所\n住所、または Googleマップのリンク/地名を入力してください：', nd.place||'');
+  if(v===null) return;
+  v=v.trim();
+  if(key==='kitahai'){ setKitahaiPlace(v); }
+  else if(nd.partner){ nd.partner.place=v; save(); }
+  renderSample();
+}
+function moveSampleStop(i,dir){
+  var j=i+dir; if(j<0||j>=_sampleOrder.length) return;
+  var tmp=_sampleOrder[i]; _sampleOrder[i]=_sampleOrder[j]; _sampleOrder[j]=tmp;
+  document.getElementById('sample-content').innerHTML=_sampleStep2();
+  setTimeout(function(){ initSampleDrag(); try{computeSampleTimes();}catch(e){} },0);
+}
+function _placeQuery(nd){
+  if(nd.place){ if(/^https?:\/\//.test(nd.place)) return null; return encodeURIComponent(nd.place); }
+  return encodeURIComponent(nd.name.replace(/（[^）]*）/g,'')+' 静岡県島田市');
+}
+function openSampleMap(){
+  var pts=[];
+  var start=getStartPlace();
+  if(start) pts.push(encodeURIComponent(start));
+  _sampleOrder.forEach(function(it){ var nd=_resolveNode(it.key); if(nd) pts.push(_placeQuery(nd)||encodeURIComponent(nd.name)); });
+  if(pts.length<2){ toast('2か所以上必要です'); return; }
+  var origin=pts[0], destination=pts[pts.length-1];
+  var waypoints=pts.slice(1,-1).join('|');
+  var url='https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+origin+'&destination='+destination+(waypoints?'&waypoints='+waypoints:'');
+  saveSampleRound(true);
+  window.open(url,'_blank');
+}
+function saveSampleRound(silent){
+  loadSampleRounds(); loadSampleLegs();
+  var date=_sampleDate();
+  var arrive=(document.getElementById('sample-arrive')||{value:''}).value||'';
+  var start=getStartPlace();
+  var target=_toMin(arrive);
+  loadSampleDwell();
+  var legsArr=_sampleOrder.map(function(it,i){ var prev=(i===0)?'START':_sampleOrder[i-1].key; return getLeg(prev,it.key)||0; });
+  var dwArr=_sampleOrder.map(function(it){ return getDwell(it.key); });
+  var totalLeg=legsArr.reduce(function(a,b){return a+b;},0); var totalDwell=0; for(var k=0;k<dwArr.length-1;k++) totalDwell+=(dwArr[k]||0);
+  var departCalc=(target!=null)?_hm(target-(totalLeg+totalDwell)):'';
+  var stops=_sampleOrder.map(function(it){ var nd=_resolveNode(it.key); return {type:it.type,key:it.key,name:nd?nd.name:'',place:nd?nd.place:''}; });
+  sampleRounds[date]={date:date,arriveTarget:arrive,departTime:departCalc,start:start,stops:stops,savedAt:new Date().toISOString()};
+  saveSampleRounds();
+  if(!silent) toast('カレンダーに記録しました');
+}
+function initSampleDrag(){
+  var cont=document.getElementById('sample-route'); if(!cont) return;
+  var dragRow=null, holdT=null, baseY=0, started=false;
+  function lift(row){
+    dragRow=row; started=true;
+    row.style.transition='none'; row.style.position='relative'; row.style.zIndex='10';
+    row.style.boxShadow='0 10px 24px rgba(0,0,0,.2)'; row.style.background='var(--matcha-light)';
+    document.body.style.userSelect='none';
+    if(navigator.vibrate)navigator.vibrate(14);
+  }
+  function drop(){
+    if(!dragRow) return;
+    dragRow.style.transform=''; dragRow.style.boxShadow=''; dragRow.style.zIndex=''; dragRow.style.position='';
+    dragRow=null; started=false; document.body.style.userSelect='';
+    document.getElementById('sample-content').innerHTML=_sampleStep2();
+    setTimeout(function(){ initSampleDrag(); try{computeSampleTimes();}catch(e){} },0);
+  }
+  cont.querySelectorAll('.sample-stop').forEach(function(row){
+    row.addEventListener('touchstart',function(e){
+      baseY=e.touches[0].clientY;
+      holdT=setTimeout(function(){ lift(row); },170);
+    },{passive:true});
+    row.addEventListener('touchmove',function(e){
+      var y=e.touches[0].clientY;
+      if(!dragRow){ if(Math.abs(y-baseY)>10) clearTimeout(holdT); return; }
+      e.preventDefault();
+      dragRow.style.transform='translateY('+(y-baseY)+'px)';
+      var rs=Array.from(cont.querySelectorAll('.sample-stop'));
+      var di=rs.indexOf(dragRow);
+      var dr=dragRow.getBoundingClientRect();
+      var center=(dr.top+dr.bottom)/2;
+      var next=rs[di+1], prev=rs[di-1];
+      if(next){
+        var nb=next.getBoundingClientRect();
+        if(center > (nb.top+nb.bottom)/2){
+          cont.insertBefore(next, dragRow);
+          var t=_sampleOrder[di]; _sampleOrder[di]=_sampleOrder[di+1]; _sampleOrder[di+1]=t;
+          baseY+=nb.height; dragRow.style.transform='translateY('+(y-baseY)+'px)';
+          return;
+        }
+      }
+      if(prev){
+        var pb=prev.getBoundingClientRect();
+        if(center < (pb.top+pb.bottom)/2){
+          cont.insertBefore(dragRow, prev);
+          var t2=_sampleOrder[di]; _sampleOrder[di]=_sampleOrder[di-1]; _sampleOrder[di-1]=t2;
+          baseY-=pb.height; dragRow.style.transform='translateY('+(y-baseY)+'px)';
+        }
+      }
+    },{passive:false});
+    row.addEventListener('touchend',function(){ clearTimeout(holdT); drop(); },{passive:true});
+    row.addEventListener('touchcancel',function(){ clearTimeout(holdT); drop(); },{passive:true});
+  });
+}
+
 
 load();
 </script>
