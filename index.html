@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.29-AS</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.29-AT</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.29-AS</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.29-AT</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -6970,7 +6970,7 @@ function editHomeAddr(){
 }
 function setSamplePlace(key){
   var nd=_resolveNode(key); if(!nd) return;
-  var v=prompt(nd.name+' の場所\n住所、または Googleマップのリンク/地名を入力してください：', nd.place||'');
+  var v=prompt(nd.name+' の場所を登録\n\n次のいずれかを入力：\n・住所（例：島田市金谷○○）\n・緯度,経度（例：34.836,138.176）← 最も正確\n・Googleマップのリンク（@緯度,経度を含むもの）\n\nGoogleマップでピンを長押し→座標をコピーして貼り付けるのが確実です。', nd.place||'');
   if(v===null) return;
   v=v.trim();
   if(key==='kitahai'){ setKitahaiPlace(v); }
@@ -6983,18 +6983,40 @@ function moveSampleStop(i,dir){
   document.getElementById('sample-content').innerHTML=_sampleStep2();
   setTimeout(function(){ initSampleDrag(); try{computeSampleTimes();}catch(e){} },0);
 }
+function _extractLatLng(str){
+  if(!str) return null;
+  // "lat,lng" 直接
+  var m=str.match(/^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  if(m) return m[1]+','+m[2];
+  // GoogleマップURL内の @lat,lng
+  m=str.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if(m) return m[1]+','+m[2];
+  // !3dlat!4dlng
+  m=str.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+  if(m) return m[1]+','+m[2];
+  // ?q=lat,lng / &query=lat,lng / destination=lat,lng
+  m=str.match(/[?&](?:q|query|destination|daddr)=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if(m) return m[1]+','+m[2];
+  return null;
+}
 function _placeQuery(nd){
-  if(nd.place){ if(/^https?:\/\//.test(nd.place)) return null; return encodeURIComponent(nd.place); }
+  var place=nd.place||'';
+  var ll=_extractLatLng(place);
+  if(ll) return encodeURIComponent(ll);                 // 座標が最も確実
+  if(place && !/^https?:\/\//.test(place)) return encodeURIComponent(place); // 住所/地名
+  if(place && /^https?:\/\//.test(place)) return null; // 座標を取り出せないURLは使えない
   return encodeURIComponent(nd.name.replace(/（[^）]*）/g,'')+' 静岡県島田市');
 }
 function openSampleMap(){
   var pts=[];
   var start=getStartPlace();
   if(start) pts.push(encodeURIComponent(start));
-  _sampleOrder.forEach(function(it){ var nd=_resolveNode(it.key); if(nd) pts.push(_placeQuery(nd)||encodeURIComponent(nd.name)); });
+  var unresolved=[];
+  _sampleOrder.forEach(function(it){ var nd=_resolveNode(it.key); if(nd){ var q=_placeQuery(nd); if(q==null){ unresolved.push(nd.name); q=encodeURIComponent(nd.name); } pts.push(q); } });
+  if(unresolved.length){ alert('次の場所はGoogleマップのリンクから位置を特定できませんでした。\n\n'+unresolved.join('、')+'\n\n「📍場所を登録」で住所、または「緯度,経度」（例：34.836,138.176）で登録すると正確にルートが出ます。'); }
   if(pts.length<2){ toast('2か所以上必要です'); return; }
   var origin=pts[0], destination=pts[pts.length-1];
-  var waypoints=pts.slice(1,-1).join('|');
+  var waypoints=pts.slice(1,-1).join('%7C');
   var url='https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+origin+'&destination='+destination+(waypoints?'&waypoints='+waypoints:'');
   saveSampleRound(true);
   window.open(url,'_blank');
