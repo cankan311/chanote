@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.01-AW</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.02-AX</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.01-AW</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.02-AX</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -3665,8 +3665,33 @@ function renderSampleRoundForDate(date){
       +'<span style="font-size:13px;font-weight:600;flex:1;">'+escText(st.name)+'</span>'
       +'<span style="font-size:10px;font-weight:700;color:'+(isP?'var(--matcha)':'var(--gold)')+';">'+(isP?'見本':'配達')+'</span></div>';
   });
+  h+='<div style="display:flex;gap:8px;margin-top:10px;">'
+    +'<button onclick="editSampleRound(\''+date+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">✏️ 編集</button>'
+    +'<button onclick="deleteSampleRound(\''+date+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--red);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">🗑 削除</button></div>';
   h+='</div>';
   return h;
+}
+function deleteSampleRound(date){
+  if(!confirm('この日の見本回りの記録を削除しますか？')) return;
+  loadSampleRounds(); delete sampleRounds[date]; saveSampleRounds();
+  toast('削除しました'); renderCalendar();
+}
+function editSampleRound(date){
+  loadSampleRounds();
+  var r=sampleRounds[date]; if(!r) return;
+  // 選択状態と順番を記録から復元
+  _sampleSel={ producers:{}, chashos:{}, spots:{} };
+  _sampleOrder=(r.stops||[]).map(function(st){
+    if(st.type==='p'){ _sampleSel.producers[st.key]=true; }
+    else if(st.type==='c'){ _sampleSel.chashos[st.key]=true; }
+    else if(st.type==='s'){ _sampleSel.spots[st.key]=true; }
+    return {type:st.type,key:st.key};
+  });
+  window._sampleArrive=r.arriveTarget||'07:00';
+  window._sampleEditDate=date;
+  _sampleStart=getStartPlace();
+  _sampleStep=2;
+  showScreen('sample'); renderSample();
 }
 
 function selDate(ds){
@@ -6982,6 +7007,14 @@ function _sampleStep2(){
   h+='<div id="sample-result" style="margin-bottom:12px;"></div>';
   h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;"><span>訪問順・各区間の移動時間</span><button onclick="computeSampleTimes()" style="font-size:11px;border:1px solid var(--matcha);background:var(--matcha-light);color:var(--matcha);font-weight:800;border-radius:12px;padding:5px 12px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">⟳ 出発時刻を計算</button></div>';
   h+='<div style="font-size:10px;color:var(--hint);margin:0 2px 8px;">移動時間は<b>地点の組み合わせ</b>で記憶されます。一度入れれば順番を変えても自動で当てはまります。</div>';
+  // 実測モードの操作
+  if(sampleLive&&sampleLive.active){
+    h+='<div style="display:flex;align-items:center;gap:8px;margin:4px 0 10px;padding:10px 12px;border-radius:12px;background:#fdeaea;border:1px solid #f0c4c4;">'
+      +'<span style="font-size:12px;font-weight:700;color:#c0392b;flex:1;">● 計測中（出発 '+_hm(new Date(sampleLive.t0).getHours()*60+new Date(sampleLive.t0).getMinutes())+'）各地点で着/発を押してください</span>'
+      +'<button onclick="endSampleLive()" style="padding:7px 12px;border-radius:9px;border:none;background:#c0392b;color:#fff;font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">■ 終了</button></div>';
+  } else {
+    h+='<button onclick="startSampleLive()" style="width:100%;margin:4px 0 10px;padding:12px;border-radius:12px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">▶ 計測しながら回る（実測を保存）</button>';
+  }
   h+='<div class="rows" id="sample-route" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">';
   _sampleOrder.forEach(function(it,i){
     var nd=_resolveNode(it.key); if(!nd) return;
@@ -6997,7 +7030,11 @@ function _sampleStep2(){
       +'<span style="width:32px;height:32px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;'+avc+'">'+av+'</span>'
       +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nd.name+'<span style="font-size:10px;font-weight:600;color:'+stopCol+';margin-left:5px;">'+stopTag+'</span></span>'
       +'<span onclick="setSamplePlace(\''+it.key+'\')" style="font-size:11px;color:'+(nd.place?'var(--muted)':'var(--red)')+';cursor:pointer;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(nd.place?'📍 '+escText(nd.place):'📍 場所を登録')+'</span>'
-      +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span></span>'
+      +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span>'
+      +((sampleLive&&sampleLive.active)?('<span style="display:flex;gap:6px;margin-top:6px;">'
+          +'<button onclick="event.stopPropagation();sampleArrive('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid '+((sampleLive.arr[i]!=null)?'var(--matcha)':'var(--border2)')+';background:'+((sampleLive.arr[i]!=null)?'var(--matcha)':'var(--surface)')+';color:'+((sampleLive.arr[i]!=null)?'#fff':'var(--ink2)')+';font-size:12px;font-weight:700;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">着'+((sampleLive.arr[i]!=null)?' '+_hm(new Date(sampleLive.arr[i]).getHours()*60+new Date(sampleLive.arr[i]).getMinutes()):'')+'</button>'
+          +'<button onclick="event.stopPropagation();sampleDepart('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid '+((sampleLive.dep[i]!=null)?'var(--gold)':'var(--border2)')+';background:'+((sampleLive.dep[i]!=null)?'var(--gold)':'var(--surface)')+';color:'+((sampleLive.dep[i]!=null)?'#fff':'var(--ink2)')+';font-size:12px;font-weight:700;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">発'+((sampleLive.dep[i]!=null)?' '+_hm(new Date(sampleLive.dep[i]).getHours()*60+new Date(sampleLive.dep[i]).getMinutes()):'')+'</button></span>'):'')
+      +'</span>'
       +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:52px;"><span style="font-size:9px;color:var(--hint);">'+(i===0?'自宅→':'移動')+'分</span>'
       +'<input type="number" inputmode="numeric" value="'+(legVal!=null?legVal:'')+'" onchange="setLegVal(\''+prevKey+'\',\''+it.key+'\',this.value);computeSampleTimes();" placeholder="分" style="width:48px;padding:6px 3px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
       +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:46px;"><span style="font-size:9px;color:var(--hint);">滞在分</span>'
@@ -7010,6 +7047,35 @@ function _sampleStep2(){
   h+='<button onclick="saveSampleRound()" style="width:100%;margin-top:12px;padding:14px;border-radius:16px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">💾 この回り方を記録（カレンダーに残す）</button>';
   return h;
 }
+
+var sampleLive=null;
+function loadSampleLive(){ try{ sampleLive=JSON.parse(_safeLS.getItem('ocha_sample_live')||'null'); }catch(e){ sampleLive=null; } }
+function saveSampleLive(){ try{ if(sampleLive) _safeLS.setItem('ocha_sample_live', JSON.stringify(sampleLive)); else _safeLS.removeItem('ocha_sample_live'); }catch(e){} }
+function startSampleLive(){
+  sampleLive={ active:true, t0:Date.now(), arr:{}, dep:{}, order:_sampleOrder.map(function(it){return it.key;}) };
+  saveSampleLive();
+  toast('計測を開始しました（出発）'); renderSample();
+}
+function endSampleLive(){
+  sampleLive=null; saveSampleLive(); toast('計測を終了しました'); renderSample();
+}
+function _liveMin(ms){ return Math.max(0, Math.round(ms/60000)); }
+function sampleArrive(i){
+  if(!sampleLive) return;
+  var now=Date.now(); sampleLive.arr[i]=now;
+  // 前地点の出発（i==0は t0）からの所要を移動時間として保存
+  var prevTs = (i===0)? sampleLive.t0 : (sampleLive.dep[i-1]||sampleLive.arr[i-1]||sampleLive.t0);
+  var key=_sampleOrder[i].key; var prevKey=(i===0)?'START':_sampleOrder[i-1].key;
+  setLegVal(prevKey, key, _liveMin(now-prevTs));
+  saveSampleLive(); renderSample();
+}
+function sampleDepart(i){
+  if(!sampleLive) return;
+  var now=Date.now(); sampleLive.dep[i]=now;
+  if(sampleLive.arr[i]!=null){ var key=_sampleOrder[i].key; setDwellVal(key, _liveMin(now-sampleLive.arr[i])); }
+  saveSampleLive(); renderSample();
+}
+
 function _hm(mins){ mins=Math.round(mins); mins=((mins%1440)+1440)%1440; var h=Math.floor(mins/60),m=mins%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
 function _toMin(hhmm){ if(!hhmm)return null; var a=hhmm.split(':'); return parseInt(a[0])*60+parseInt(a[1]); }
 function computeSampleTimes(){
@@ -7098,6 +7164,7 @@ function openSampleMap(){
 function saveSampleRound(silent){
   loadSampleRounds(); loadSampleLegs();
   var date=_sampleDate();
+  if(window._sampleEditDate){ /* 編集時も日付入力を尊重 */ }
   var arrive=(document.getElementById('sample-arrive')||{value:''}).value||'';
   var start=getStartPlace();
   var target=_toMin(arrive);
