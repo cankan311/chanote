@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.29-AT</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.30-AU</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.29-AT</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.30-AU</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -6804,9 +6804,12 @@ function closeFabMenu(){ var m=document.getElementById('fab-menu'); if(m) m.remo
 /* ===== 見本回り（ペア記憶＋キタハイ一括） ===== */
 var sampleRounds={};
 var sampleLegs={};   // ペアごとの移動時間 { "a__b": 分 }
+var sampleSpots=[];  // 自由な立ち寄り先 [{id,name,place}]
 function loadSampleRounds(){ try{ sampleRounds=JSON.parse(_safeLS.getItem('ocha_sample_rounds')||'{}'); }catch(e){ sampleRounds={}; } }
 function saveSampleRounds(){ try{ _safeLS.setItem('ocha_sample_rounds', JSON.stringify(sampleRounds)); }catch(e){} }
 function loadSampleLegs(){ try{ sampleLegs=JSON.parse(_safeLS.getItem('ocha_sample_legs')||'{}'); }catch(e){ sampleLegs={}; } }
+function loadSampleSpots(){ try{ sampleSpots=JSON.parse(_safeLS.getItem('ocha_sample_spots')||'[]'); }catch(e){ sampleSpots=[]; } }
+function saveSampleSpots(){ try{ _safeLS.setItem('ocha_sample_spots', JSON.stringify(sampleSpots)); }catch(e){} }
 function saveSampleLegs(){ try{ _safeLS.setItem('ocha_sample_legs', JSON.stringify(sampleLegs)); }catch(e){} }
 function getStartPlace(){ try{ return _safeLS.getItem('ocha_sample_start')||''; }catch(e){ return ''; } }
 function setStartPlace(v){ try{ _safeLS.setItem('ocha_sample_start', v||''); }catch(e){} }
@@ -6816,6 +6819,7 @@ function setKitahaiPlace(v){ try{ _safeLS.setItem('ocha_sample_kitahai_place', v
 function _isKitahai(p){ return p.type==='producer' && (typeof docCanonName==='function') && docCanonName(p.name)==='キタハイ'; }
 function _resolveNode(key){
   if(key==='kitahai') return {key:'kitahai',name:'キタハイ（茶業センター一括）',type:'p',place:kitahaiPlace()};
+  if(String(key).indexOf('spot_')===0){ var sp=sampleSpots.find(function(x){return x.id===key;}); return sp?{key:key,name:sp.name,type:'s',place:sp.place||'',spot:sp}:null; }
   var p=partners.find(function(x){return String(x.id)===String(key);});
   if(!p) return null;
   return {key:String(p.id),name:p.name,type:(p.type==='producer'?'p':'c'),place:p.place||'',partner:p};
@@ -6831,7 +6835,7 @@ function homeAddr(){ return getStartPlace(); }
 function setHomeAddr(v){ setStartPlace(v); }
 
 var _sampleStep=1;
-var _sampleSel={ producers:{}, chashos:{} };  // key -> true（producersは pid または 'kitahai'）
+var _sampleSel={ producers:{}, chashos:{}, spots:{} };  // key -> true
 var _sampleOrder=[];   // [{type:'p'|'c', key}]
 var _sampleStart='';
 
@@ -6868,9 +6872,46 @@ function _sampleStep1(){
   h+='<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'+pHtml+'</div>';
   h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>🏪 配る茶商</span><span style="color:var(--gold);">'+cCount+'件</span></div>';
   h+='<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'+chashos.map(function(p){return row(String(p.id),p.name,'chashos');}).join('')+'</div>';
-  h+='<button onclick="sampleGoStep2()" style="width:100%;margin-top:20px;padding:15px;border-radius:16px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(52,104,74,.3);">順番を決める ('+(pCount+cCount)+'件) ›</button>';
+
+  // 立ち寄り先（自由）
+  var sCount=Object.keys(_sampleSel.spots).filter(function(k){return _sampleSel.spots[k];}).length;
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>📍 立ち寄り先（自由）</span><span style="color:var(--muted);">'+sCount+'件</span></div>';
+  var spotRows='';
+  sampleSpots.forEach(function(sp){
+    var on=_sampleSel.spots[sp.id];
+    spotRows+='<div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--border);">'
+      +'<span onclick="toggleSampleSel(\'spots\',\''+sp.id+'\')" style="display:flex;align-items:center;gap:11px;flex:1;min-width:0;cursor:pointer;">'
+      +'<span style="width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;background:var(--paper2);color:var(--muted);">📍</span>'
+      +'<span style="flex:1;min-width:0;"><span style="font-size:15px;font-weight:600;'+(on?'':'color:var(--muted);')+'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escText(sp.name)+'</span>'+(sp.place?'<span style="font-size:10px;color:var(--hint);">'+escText(sp.place)+'</span>':'<span style="font-size:10px;color:var(--red);">場所未登録</span>')+'</span></span>'
+      +'<button onclick="editSampleSpot(\''+sp.id+'\')" style="border:none;background:none;color:var(--hint);font-size:13px;cursor:pointer;flex:none;padding:4px;">✎</button>'
+      +'<span onclick="toggleSampleSel(\'spots\',\''+sp.id+'\')" style="width:26px;height:26px;border-radius:8px;border:2px solid '+(on?'var(--matcha)':'var(--border2)')+';background:'+(on?'var(--matcha)':'transparent')+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;flex:none;cursor:pointer;">'+(on?'✓':'')+'</span></div>';
+  });
+  spotRows+='<div onclick="addSampleSpot()" style="display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;color:var(--matcha);font-weight:700;font-size:14px;"><span style="width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--matcha-light);">＋</span>立ち寄り先を追加</div>';
+  h+='<div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">'+spotRows+'</div>';
+
+  h+='<button onclick="sampleGoStep2()" style="width:100%;margin-top:20px;padding:15px;border-radius:16px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(52,104,74,.3);">順番を決める ('+(pCount+cCount+sCount)+'件) ›</button>';
   return h;
 }
+
+function addSampleSpot(){
+  loadSampleSpots();
+  var name=prompt('立ち寄り先の名前\n（例：朝日園（本社）、朝日園（駐車場）、○○給油所 など）','');
+  if(name===null) return; name=name.trim(); if(!name){ return; }
+  var id='spot_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+  sampleSpots.push({id:id,name:name,place:''}); saveSampleSpots();
+  _sampleSel.spots[id]=true;
+  document.getElementById('sample-content').innerHTML=_sampleStep1();
+}
+function editSampleSpot(id){
+  loadSampleSpots();
+  var sp=sampleSpots.find(function(x){return x.id===id;}); if(!sp) return;
+  var name=prompt('名前を変更（空欄にすると削除します）',sp.name);
+  if(name===null) return; name=name.trim();
+  if(!name){ sampleSpots=sampleSpots.filter(function(x){return x.id!==id;}); delete _sampleSel.spots[id]; saveSampleSpots(); document.getElementById('sample-content').innerHTML=_sampleStep1(); return; }
+  sp.name=name; saveSampleSpots();
+  document.getElementById('sample-content').innerHTML=_sampleStep1();
+}
+
 function toggleSampleSel(grp,key){
   _sampleSel[grp][key]=!_sampleSel[grp][key];
   document.getElementById('sample-content').innerHTML=_sampleStep1();
@@ -6884,6 +6925,7 @@ function sampleGoStep2(){
     else if(_sampleSel.producers[String(p.id)]) order.push({type:'p',key:String(p.id)});
   });
   partners.forEach(function(p){ if(p.type==='chasho'&&_sampleSel.chashos[String(p.id)]) order.push({type:'c',key:String(p.id)}); });
+  sampleSpots.forEach(function(sp){ if(_sampleSel.spots[sp.id]) order.push({type:'s',key:sp.id}); });
   if(!order.length){ toast('まわる先を選んでください'); return; }
   _sampleOrder=order; _sampleStart=getStartPlace(); _sampleStep=2; renderSample();
 }
@@ -6913,16 +6955,17 @@ function _sampleStep2(){
   h+='<div class="rows" id="sample-route" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">';
   _sampleOrder.forEach(function(it,i){
     var nd=_resolveNode(it.key); if(!nd) return;
-    var isP=it.type==='p';
+    var isP=it.type==='p'; var isS=it.type==='s';
+    var stopTag=isP?'見本':isS?'立寄':'配達'; var stopCol=isP?'var(--matcha)':isS?'var(--muted)':'var(--gold)';
     var prevKey=(i===0)?'START':_sampleOrder[i-1].key;
     var legVal=getLeg(prevKey,it.key);
-    var av=nd.name.replace(/[（(].*$/,'').slice(0,1);
-    var avc=isP?'background:var(--matcha-light);color:var(--matcha);':'background:var(--gold-light);color:var(--gold);';
+    var av=isS?'📍':nd.name.replace(/[（(].*$/,'').slice(0,1);
+    var avc=isP?'background:var(--matcha-light);color:var(--matcha);':isS?'background:var(--paper2);color:var(--muted);':'background:var(--gold-light);color:var(--gold);';
     h+='<div class="sample-stop" data-idx="'+i+'" style="display:flex;align-items:center;gap:10px;padding:11px 12px;'+(i<_sampleOrder.length-1?'border-bottom:1px solid var(--border);':'')+'background:var(--surface);">'
       +'<span style="color:var(--hint);font-size:15px;flex:none;">≡</span>'
       +'<span style="width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;" class="num">'+(i+1)+'</span>'
       +'<span style="width:32px;height:32px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;'+avc+'">'+av+'</span>'
-      +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nd.name+'<span style="font-size:10px;font-weight:600;color:'+(isP?'var(--matcha)':'var(--gold)')+';margin-left:5px;">'+(isP?'見本':'配達')+'</span></span>'
+      +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nd.name+'<span style="font-size:10px;font-weight:600;color:'+stopCol+';margin-left:5px;">'+stopTag+'</span></span>'
       +'<span onclick="setSamplePlace(\''+it.key+'\')" style="font-size:11px;color:'+(nd.place?'var(--muted)':'var(--red)')+';cursor:pointer;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(nd.place?'📍 '+escText(nd.place):'📍 場所を登録')+'</span>'
       +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span></span>'
       +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:52px;"><span style="font-size:9px;color:var(--hint);">'+(i===0?'自宅→':'移動')+'分</span>'
@@ -6974,6 +7017,7 @@ function setSamplePlace(key){
   if(v===null) return;
   v=v.trim();
   if(key==='kitahai'){ setKitahaiPlace(v); }
+  else if(String(key).indexOf('spot_')===0){ loadSampleSpots(); var sp=sampleSpots.find(function(x){return x.id===key;}); if(sp){ sp.place=v; saveSampleSpots(); } }
   else if(nd.partner){ nd.partner.place=v; save(); }
   renderSample();
 }
