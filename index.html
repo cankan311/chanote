@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.28-AR</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.06.29-AS</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.28-AR</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.06.29-AS</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -4482,6 +4482,31 @@ function renderAnalyze(){
         h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">二本指ピンチでズーム／下のバーで範囲移動／凡例タップで表示切替</div>';
         h+='</div>';
       }
+    } else if(id==='compgraph'){
+      var hasComp = ftrades.some(function(t){return t.components && (t.components['窒素']!=null||t.components['繊維']!=null||t.components['タンニン']!=null);});
+      if(hasComp){
+        if(window._compMetric==null) window._compMetric='窒素';
+        var metrics=[['窒素','窒素'],['繊維','繊維'],['タンニン','タンニン'],['price','単価']];
+        h+='<div class="section-label">生産家別 '+( _compMetric==='price'?'単価':_compMetric)+'の推移</div>';
+        h+='<div class="card" style="margin-bottom:14px;padding:14px;">';
+        h+='<div class="seg" style="display:flex;gap:3px;background:var(--paper2);padding:3px;border-radius:11px;margin-bottom:12px;">';
+        metrics.forEach(function(m){
+          var on=_compMetric===m[0];
+          h+='<button onclick="setCompMetric(\''+m[0]+'\')" style="flex:1;padding:7px 2px;font-size:12px;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;'+(on?'background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);':'background:transparent;color:var(--muted);')+'">'+m[1]+'</button>';
+        });
+        h+='</div>';
+        h+='<div style="position:relative;height:300px;"><div id="comp-chart" data-ec style="width:100%;height:100%;"></div></div>';
+        h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">凡例（生産家名）をタップで表示/非表示。ピンチでズーム。成分の入った取引のみ表示。</div>';
+        h+='</div>';
+      }
+    } else if(id==='komigraph'){
+      if(ftrades.length){
+        h+='<div class="section-label">日毎の斡旋口銭の推移</div>';
+        h+='<div class="card" style="margin-bottom:14px;padding:14px;">';
+        h+='<div style="position:relative;height:280px;"><div id="komi-chart" data-ec style="width:100%;height:100%;"></div></div>';
+        h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">各取引の口銭率（湯日/下湯日/吹木→ハラダは1.6%、他1.8%）で日別合計。ピンチでズーム。</div>';
+        h+='</div>';
+      }
     } else if(id==='buyer'){
       if(buyers.length){
         h+='<div class="section-label">販売先別 合計数量</div>';
@@ -4555,7 +4580,7 @@ function renderAnalyze(){
   // タブ別のセクション割り当て
   var TAB_SECTIONS = {
     summary:  ['summary','komisyon','pavgqty','buyer'],
-    graph:    ['ovgraph','pgraph'],
+    graph:    ['ovgraph','compgraph','komigraph','pgraph'],
     forecast: ['forecast','pfore','opstats'],
   };
   var visibleIds = TAB_SECTIONS[analyzeTab] || TAB_SECTIONS.summary;
@@ -4587,6 +4612,7 @@ function renderAnalyze(){
   el.innerHTML=html;
   if(analyzeTab==='graph' && ftrades.length) setTimeout(function(){renderOverviewCharts();},50);
   if(analyzeTab==='graph' && producers.length&&ftrades.length) setTimeout(function(){renderProducerCharts();},50);
+  if(analyzeTab==='graph') setTimeout(function(){ try{renderCompChart();}catch(e){} try{renderKomiChart();}catch(e){} },60);
 }
 
 /* ---- 生産家別残量予測 ---- */
@@ -4661,6 +4687,8 @@ var ANALYZE_SECTIONS=[
   {id:'pfore',    label:'生産家別 残日数予測'},
   {id:'opstats',  label:'生産家別 稼働状況'},
   {id:'pavgqty',  label:'生産家別 平均単価・合計数量'},
+  {id:'compgraph', label:'生産家別 成分・単価の推移'},
+  {id:'komigraph', label:'日毎の斡旋口銭の推移'},
   {id:'pgraph',   label:'生産家別 価格・数量グラフ'},
   {id:'buyer',    label:'販売先別 合計数量'},
 ];
@@ -5764,6 +5792,73 @@ function undoDelete(){
   var bar=document.getElementById('undo-bar'); if(bar) bar.style.display='none';
   loadMemos(); renderAll(); renderCalendar();
   toast('元に戻しました');
+}
+
+
+/* ===== 成分×単価の推移／日毎の斡旋口銭 ===== */
+function setCompMetric(m){ window._compMetric=m; renderAnalyze(); }
+function renderCompChart(){
+  if(typeof echarts==='undefined') return;
+  var c=ecInit('comp-chart'); if(!c) return;
+  var metric=window._compMetric||'窒素';
+  var ft=getFilteredTrades().filter(function(t){
+    if(metric==='price') return (t.totalQty||0)>0;
+    return t.components && t.components[metric]!=null && !isNaN(t.components[metric]);
+  });
+  if(!ft.length){ c.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); return; }
+  // 日付軸
+  var dset={}, dates=[]; ft.forEach(function(t){ if(t.date&&!dset[t.date]){dset[t.date]=1;dates.push(t.date);} }); dates.sort();
+  var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
+  // 生産家ごとに系列化（茶農協はdocCanonNameでまとめる）
+  function gname(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  var groups={};
+  ft.forEach(function(t){ var g=gname(t); if(!groups[g]) groups[g]={}; 
+    var v = metric==='price' ? (function(){ var q=t.totalQty||0; return q>0?Math.round(tradeAmount(t)/q):t.price; })() : t.components[metric];
+    // 同日複数は平均
+    if(groups[g][t.date]==null) groups[g][t.date]=[];
+    groups[g][t.date].push(v);
+  });
+  var names=Object.keys(groups);
+  var series=names.map(function(g,i){
+    return {name:g, type:'line', connectNulls:true, smooth:true, symbolSize:6,
+      data:dates.map(function(d){ var arr=groups[g][d]; if(!arr||!arr.length) return null; return Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length*100)/100; }),
+      lineStyle:{width:2}, itemStyle:{color:EC_PALETTE[i%EC_PALETTE.length]} };
+  });
+  var unit = metric==='price'?'円/kg':'';
+  c.setOption({
+    color:EC_PALETTE, textStyle:{fontFamily:EC_FONT},
+    tooltip:{trigger:'axis', valueFormatter:function(v){return v==null?'—':(v+(unit?(' '+unit):''));}},
+    legend:{type:'scroll', top:0, textStyle:{fontFamily:EC_FONT,fontSize:11}},
+    grid:{left:48,right:14,top:38,bottom:48},
+    xAxis:{type:'category', data:labels, axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86'}},
+    yAxis:{type:'value', scale:true, axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86'}, splitLine:{lineStyle:{color:'#f0ede6'}}},
+    dataZoom:[{type:'inside'},{type:'slider',height:16,bottom:14}],
+    series:series
+  });
+}
+function renderKomiChart(){
+  if(typeof echarts==='undefined') return;
+  var c=ecInit('komi-chart'); if(!c) return;
+  var ft=getFilteredTrades();
+  var byDate={};
+  ft.forEach(function(t){
+    if(!t.date) return;
+    var rate=(typeof getFeeRate==='function')?getFeeRate(t.producerId,t.buyerId):0.018;
+    byDate[t.date]=(byDate[t.date]||0)+tradeAmount(t)*rate;
+  });
+  var dates=Object.keys(byDate).sort();
+  if(!dates.length){ c.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); return; }
+  var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
+  var vals=dates.map(function(d){return Math.round(byDate[d]);});
+  c.setOption({
+    color:['#c89b3c'], textStyle:{fontFamily:EC_FONT},
+    tooltip:{trigger:'axis', valueFormatter:function(v){return ecMoney(v);}},
+    grid:{left:54,right:14,top:20,bottom:48},
+    xAxis:{type:'category', data:labels, axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86'}},
+    yAxis:{type:'value', axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86',formatter:function(v){return v>=10000?(v/10000)+'万':v;}}, splitLine:{lineStyle:{color:'#f0ede6'}}},
+    dataZoom:[{type:'inside'},{type:'slider',height:16,bottom:14}],
+    series:[{name:'斡旋口銭', type:'bar', data:vals, itemStyle:{color:'#c89b3c',borderRadius:[4,4,0,0]}}]
+  });
 }
 
 /* ===== ECharts 共通基盤 ===== */
