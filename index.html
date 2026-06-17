@@ -675,7 +675,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
   <!-- 取引記録フォーム -->
   <div class="card">
     <div class="field-group"><label>📅 取引日</label><input type="date" id="t-date"></div>
-    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="prefillFromProducer();liveCalc()"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>🏪 売先</label><select id="t-buyer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>品種</label><select id="t-variety"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview();liveCalc()"></div>
@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.02-AX</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.03-AY</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.02-AX</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.03-AY</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2963,6 +2963,36 @@ function renderComponentSettings(){
     return '<div class="settings-item"><span style="font-size:14px;">'+c+'</span><button class="del-btn" onclick="removeComponent(\''+c+'\')">🗑</button></div>';
   }).join('');
 }
+
+/* 仕入元を選んだら前回取引の内容を自動入力（金額・数量は除く） */
+function prefillFromProducer(){
+  var pid=parseInt((document.getElementById('t-producer')||{}).value)||0;
+  if(!pid) return;
+  // この仕入元の最新取引
+  var last=trades.filter(function(t){return t.producerId===pid;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;})[0];
+  if(!last) return;
+  // 売先（空のときだけ自動。ユーザーが既に選んでいたら尊重）
+  var bsel=document.getElementById('t-buyer');
+  if(bsel && !bsel.value && last.buyerId){ bsel.value=last.buyerId; }
+  // 品種
+  var vsel=document.getElementById('t-variety');
+  if(vsel && !vsel.value && last.variety){
+    // optionが無ければ追加
+    if(!Array.prototype.some.call(vsel.options,function(o){return o.value===last.variety;})){
+      var op=document.createElement('option'); op.value=last.variety; op.textContent=last.variety; vsel.appendChild(op);
+    }
+    vsel.value=last.variety;
+  }
+  // 粉引き
+  if(last.kobiki!=null){
+    var btns=document.querySelectorAll('#kobiki-btns .kobiki-btn'); var matched=false;
+    btns.forEach(function(b){ if(b.dataset.val!=='custom' && parseFloat(b.dataset.val)===last.kobiki){ selectKobiki(b); matched=true; } });
+    if(!matched && last.kobiki>0){ var cb=document.querySelector('#kobiki-btns .kobiki-btn[data-val="custom"]'); if(cb){ selectKobiki(cb); var ci=document.getElementById('t-kobiki-custom'); if(ci){ ci.value=last.kobiki; } } }
+  }
+  // 成分の項目名だけ前回に合わせて用意（数値は空のまま）
+  toast(last.date.slice(5).replace('-','/')+'の内容を引用（金額・数量は未入力）');
+}
+
 function renderComponentInputs(){
   var el=document.getElementById('component-inputs'); if(!el) return;
   if(!components.length){el.innerHTML='<div style="font-size:12px;color:var(--hint);margin-bottom:8px;grid-column:1/-1;">⚙️ 設定タブで成分分析項目を追加できます</div>';return;}
@@ -5835,8 +5865,10 @@ function renderCompChart(){
   var dset={}, dates=[]; ft.forEach(function(t){ if(t.date&&!dset[t.date]){dset[t.date]=1;dates.push(t.date);} }); dates.sort();
   var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
   // 生産家ごとに系列化（茶農協はdocCanonNameでまとめる）
-  function gname(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  function _pp(t){ return partners.find(function(x){return x.id===t.producerId;}); }
+  function gname(t){ var p=_pp(t); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
   var groups={};
+  ft=ft.filter(function(t){ var p=_pp(t); return p && p.type==='producer'; }); // 生産家が売り手の取引だけ（茶商間取引を除外）
   ft.forEach(function(t){ var g=gname(t); if(!groups[g]) groups[g]={}; 
     var v = metric==='price' ? (function(){ var q=t.totalQty||0; return q>0?Math.round(tradeAmount(t)/q):t.price; })() : t.components[metric];
     // 同日複数は平均
@@ -6083,7 +6115,7 @@ function renderOverviewCharts(){
 function renderProducerChartsEc(){
   if(typeof echarts==='undefined') return;
   // タブ全体のフィルターに従う。生産家未指定なら、データのある先頭の生産家を表示。
-  var ft=getFilteredTrades();
+  var ft=getFilteredTrades().filter(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); return p && p.type==='producer'; });
   var pid;
   if(analyzeProducer!=='all'){ pid=parseInt(analyzeProducer); }
   else {
