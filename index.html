@@ -634,6 +634,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
   <div style="width:40px;height:5px;border-radius:3px;background:var(--border2);margin:8px auto 16px;"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
     <button class="more-item" onclick="moreGo('sample')" id="more-sample"><span class="mi-ico">🚗</span>見本</button>
+    <button class="more-item" onclick="moreGo('insight')" id="more-insight"><span class="mi-ico">🧠</span>状況分析</button>
     <button class="more-item" onclick="moreGo('partners')" id="more-partners"><span class="mi-ico">👥</span>取引先</button>
     <button class="more-item" onclick="moreGo('market')" id="more-market"><span class="mi-ico">📣</span>市場・情報</button>
     <button class="more-item" onclick="moreGo('order')" id="more-order"><span class="mi-ico">📋</span>注文</button>
@@ -1090,6 +1091,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
   <div id="sample-content"></div>
 </div>
 
+<div id="screen-insight" class="screen">
+  <div id="insight-content"></div>
+</div>
+
 <div id="screen-settings" class="screen">
   <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">設定</div>
   <div class="section-label">🎨 テーマ</div>
@@ -1150,7 +1155,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.03-AZ</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.05-BC</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1612,7 +1617,7 @@ function toast(msg){
 }
 
 var PRIMARY_TABS=['home','trades','calendar','analyze'];
-var MORE_SCREENS=['sample','partners','market','order','docs','new-trade','settings'];
+var MORE_SCREENS=['sample','insight','partners','market','order','docs','new-trade','settings'];
 function _setActiveTab(name){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   if(PRIMARY_TABS.indexOf(name)>=0){ var tb=document.getElementById('tab-'+name); if(tb) tb.classList.add('active'); }
@@ -1652,6 +1657,7 @@ function showScreen(name, isBack){
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
   if(name==='sample') renderSample();
+  if(name==='insight') renderInsight();
   if(name==='order') renderOrder();
   if(name==='market'){ initMarketPreviews(); try{ renderSoubaBoard(); }catch(e){} }
   if(name==='settings'){ notionLoadSettings(); gsLoadSettings(); renderThemeButtons();
@@ -1825,7 +1831,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.03-AZ</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.05-BC</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -3689,11 +3695,14 @@ function renderSampleRoundForDate(date){
   h+='<div class="card pad" style="margin-bottom:10px;">';
   h+='<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">'+(r.departTime?'🚗 出発 '+r.departTime:'')+(r.arriveTarget?' → '+r.arriveTarget+' 到着目標':'')+(r.start?' ・ '+escText(r.start)+' から':'')+'</div>';
   r.stops.forEach(function(st,i){
-    var isP=st.type==='p';
-    h+='<div style="display:flex;align-items:center;gap:9px;padding:5px 0;">'
+    var isP=st.type==='p'; var isS=st.type==='s';
+    var tag=isP?'見本':isS?'立寄':'配達'; var col=isP?'var(--matcha)':isS?'var(--muted)':'var(--gold)';
+    var tstr='';
+    if(st.arrive){ tstr=(st.leg!=null?'<span style="color:var(--hint);">▼'+st.leg+'分</span> ':'')+'着 '+st.arrive+(st.depart?' / 発 '+st.depart:''); }
+    h+='<div style="display:flex;align-items:center;gap:9px;padding:6px 0;'+(i<r.stops.length-1?'border-bottom:1px dashed var(--border);':'')+'">'
       +'<span style="width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;">'+(i+1)+'</span>'
-      +'<span style="font-size:13px;font-weight:600;flex:1;">'+escText(st.name)+'</span>'
-      +'<span style="font-size:10px;font-weight:700;color:'+(isP?'var(--matcha)':'var(--gold)')+';">'+(isP?'見本':'配達')+'</span></div>';
+      +'<span style="flex:1;min-width:0;"><span style="font-size:13px;font-weight:600;display:block;">'+escText(st.name)+'<span style="font-size:10px;font-weight:700;color:'+col+';margin-left:5px;">'+tag+'</span></span>'
+      +(tstr?'<span class="num" style="font-size:11px;color:var(--ink2);">'+tstr+'</span>':'')+'</span></div>';
   });
   h+='<div style="display:flex;gap:8px;margin-top:10px;">'
     +'<button onclick="editSampleRound(\''+date+'\')" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">✏️ 編集</button>'
@@ -5463,6 +5472,97 @@ var MARKET_PREVIEWS={
   matching:'・静岡・鹿児島の茶農家後継者支援制度\n・新規就農マッチングサービス情報\n・農水省・各県の就農補助金\n・担い手不足への先進取組み事例'
 };
 
+/* ===== 状況分析（集計＋Claudeへ渡す質問文） ===== */
+function _insightData(){
+  var today=todayStr();
+  var sn=seasonForDate(today)||((getSeasonDefs().slice().sort(function(a,b){return String(b.startDate).localeCompare(String(a.startDate));})[0]||{}).name);
+  var sTr=trades.filter(function(t){return t.season===sn;});
+  function isProd(id){ var p=partners.find(function(x){return x.id===id;}); return p&&p.type==='producer'; }
+  // 生産家が売り手の取引（茶商間を除く）
+  var prodTr=sTr.filter(function(t){return isProd(t.producerId);});
+  var q=prodTr.reduce(function(a,t){return a+(t.totalQty||0);},0);
+  var amt=prodTr.reduce(function(a,t){return a+tradeAmount(t);},0);
+  var avg=q>0?Math.round(amt/q):0;
+  // 生産家別
+  function gname(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(!p)return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  var byProd={};
+  prodTr.forEach(function(t){ var g=gname(t); if(!byProd[g])byProd[g]={q:0,a:0,n:0}; byProd[g].q+=(t.totalQty||0); byProd[g].a+=tradeAmount(t); byProd[g].n++; });
+  // 茶商別（売り先）
+  var byBuyer={};
+  prodTr.forEach(function(t){ var b=partners.find(function(x){return x.id===t.buyerId;}); var nm=b?b.name:'—'; if(!byBuyer[nm])byBuyer[nm]={q:0,a:0}; byBuyer[nm].q+=(t.totalQty||0); byBuyer[nm].a+=tradeAmount(t); });
+  // 品種別
+  var byVar={};
+  prodTr.forEach(function(t){ var v=t.variety||'（無記入）'; if(!byVar[v])byVar[v]={q:0,a:0}; byVar[v].q+=(t.totalQty||0); byVar[v].a+=tradeAmount(t); });
+  // 直近相場メモ
+  loadMemos();
+  var soubaMemos=allMemos.filter(function(m){return m.tags&&m.tags.indexOf('相場')>=0;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).slice(0,5);
+  return {today:today,sn:sn,n:prodTr.length,q:q,amt:amt,avg:avg,byProd:byProd,byBuyer:byBuyer,byVar:byVar,souba:soubaMemos};
+}
+function _fmtKg(n){ return n>=1000?(n/1000).toFixed(1)+'t':Math.round(n)+'kg'; }
+function _fmtYen(n){ return n>=100000000?(n/100000000).toFixed(2)+'億円':n>=10000?Math.round(n/10000).toLocaleString()+'万円':Math.round(n).toLocaleString()+'円'; }
+function renderInsight(){
+  var el=document.getElementById('insight-content'); if(!el) return;
+  var d=_insightData();
+  var prodArr=Object.keys(d.byProd).map(function(k){return {name:k,q:d.byProd[k].q,a:d.byProd[k].a,n:d.byProd[k].n,avg:d.byProd[k].q>0?Math.round(d.byProd[k].a/d.byProd[k].q):0};}).sort(function(a,b){return b.q-a.q;});
+  var buyArr=Object.keys(d.byBuyer).map(function(k){return {name:k,q:d.byBuyer[k].q,a:d.byBuyer[k].a};}).sort(function(a,b){return b.a-a.a;});
+  var varArr=Object.keys(d.byVar).map(function(k){return {name:k,q:d.byVar[k].q,a:d.byVar[k].a,avg:d.byVar[k].q>0?Math.round(d.byVar[k].a/d.byVar[k].q):0};}).sort(function(a,b){return b.q-a.q;});
+
+  var h='<div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">状況分析</div>';
+  if(!d.n){ el.innerHTML=h+'<div class="card pad" style="text-align:center;color:var(--muted);padding:36px 16px;">'+(d.sn||'今茶期')+'の取引データがまだありません</div>'; return; }
+  h+='<div style="font-size:12px;color:var(--muted);margin-bottom:14px;">'+(d.sn||'')+'の取引データから、今の状況を自動でまとめました。下の「Claudeに分析を依頼」で、より深い読み解き（傾向・注意点・打ち手）を相談できます。</div>';
+
+  // サマリーカード
+  h+='<div class="card pad" style="margin-bottom:14px;">'
+    +'<div style="display:flex;gap:8px;text-align:center;">'
+    +'<div style="flex:1;"><div style="font-size:10px;color:var(--hint);font-weight:700;">取引</div><div class="num" style="font-size:18px;font-weight:800;">'+d.n+'件</div></div>'
+    +'<div style="flex:1.2;"><div style="font-size:10px;color:var(--hint);font-weight:700;">数量</div><div class="num" style="font-size:18px;font-weight:800;color:var(--matcha);">'+_fmtKg(d.q)+'</div></div>'
+    +'<div style="flex:1.2;"><div style="font-size:10px;color:var(--hint);font-weight:700;">平均単価</div><div class="num" style="font-size:18px;font-weight:800;">'+d.avg.toLocaleString()+'</div></div>'
+    +'<div style="flex:1.2;"><div style="font-size:10px;color:var(--hint);font-weight:700;">金額</div><div class="num" style="font-size:18px;font-weight:800;">'+_fmtYen(d.amt)+'</div></div>'
+    +'</div></div>';
+
+  function listCard(title,arr,fmt){
+    var x='<div class="section-label">'+title+'</div><div class="card" style="padding:4px 16px;margin-bottom:6px;">';
+    arr.slice(0,6).forEach(function(r,i){ x+='<div style="display:flex;justify-content:space-between;padding:10px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'font-size:13px;"><span style="color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;">'+escText(r.name)+'</span><span class="num" style="font-weight:700;">'+fmt(r)+'</span></div>'; });
+    x+='</div>'; return x;
+  }
+  h+=listCard('生産家別（数量順）',prodArr,function(r){return _fmtKg(r.q)+' ・ '+r.avg.toLocaleString()+'円';});
+  h+=listCard('売り先別（金額順）',buyArr,function(r){return _fmtYen(r.a)+' ・ '+_fmtKg(r.q);});
+  h+=listCard('品種別（数量順）',varArr,function(r){return _fmtKg(r.q)+' ・ '+r.avg.toLocaleString()+'円';});
+
+  h+='<button onclick="copyInsightPrompt()" style="width:100%;margin-top:16px;padding:15px;border-radius:16px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(52,104,74,.3);">🧠 Claudeに分析を依頼（質問文をコピー）</button>';
+  h+='<div style="font-size:11px;color:var(--hint);text-align:center;margin-top:6px;line-height:1.6;">押すと、上の集計を含んだ質問文がコピーされます。Claudeのチャットに貼り付けて送ると、傾向・注意点・打ち手を読み解いてくれます。</div>';
+  el.innerHTML=h;
+}
+function copyInsightPrompt(){
+  var d=_insightData();
+  var prodArr=Object.keys(d.byProd).map(function(k){return {name:k,q:d.byProd[k].q,a:d.byProd[k].a,n:d.byProd[k].n,avg:d.byProd[k].q>0?Math.round(d.byProd[k].a/d.byProd[k].q):0};}).sort(function(a,b){return b.q-a.q;});
+  var buyArr=Object.keys(d.byBuyer).map(function(k){return {name:k,q:d.byBuyer[k].q,a:d.byBuyer[k].a};}).sort(function(a,b){return b.a-a.a;});
+  var varArr=Object.keys(d.byVar).map(function(k){return {name:k,q:d.byVar[k].q,a:d.byVar[k].a,avg:d.byVar[k].q>0?Math.round(d.byVar[k].a/d.byVar[k].q):0};}).sort(function(a,b){return b.q-a.q;});
+  var L=[];
+  L.push('あなたは日本茶の取引に詳しいアナリストです。私は静岡県島田市の茶の斡旋人（生産家と茶商をつなぐ仲介）です。以下は私のアプリに記録された'+(d.sn||'今茶期')+'の取引データの集計です。これをもとに、①今の状況の要点、②気づきにくい傾向や偏り、③注意すべき点、④次に取るべき具体的な打ち手 を、斡旋人の立場で実務的に分析してください。');
+  L.push('');
+  L.push('【全体】取引'+d.n+'件 / 数量'+_fmtKg(d.q)+' / 平均単価'+d.avg.toLocaleString()+'円 / 金額'+_fmtYen(d.amt));
+  L.push('');
+  L.push('【生産家別（数量順）】');
+  prodArr.slice(0,12).forEach(function(r){ L.push('・'+r.name+'：'+_fmtKg(r.q)+'、平均'+r.avg.toLocaleString()+'円、'+r.n+'回'); });
+  L.push('');
+  L.push('【売り先（茶商）別（金額順）】');
+  buyArr.slice(0,12).forEach(function(r){ L.push('・'+r.name+'：'+_fmtYen(r.a)+'、'+_fmtKg(r.q)); });
+  L.push('');
+  L.push('【品種別（数量順）】');
+  varArr.slice(0,12).forEach(function(r){ L.push('・'+r.name+'：'+_fmtKg(r.q)+'、平均'+r.avg.toLocaleString()+'円'); });
+  if(d.souba&&d.souba.length){
+    L.push('');
+    L.push('【最近の相場メモ】');
+    d.souba.forEach(function(m){ L.push('・'+(m.date||'')+'：'+(m.body||'').replace(/\n/g,' ').slice(0,80)); });
+  }
+  L.push('');
+  L.push('※斡旋人にとって最も大事なのは「どこにまだ茶が残っていて、どこが何を必要としているか」という情報です。その観点も含めて読み解いてください。');
+  var text=L.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){showCopyToast();}).catch(function(){fallbackCopy(text);}); }
+  else { fallbackCopy(text); }
+}
+
 function copyPrompt(type){
   var prompt=MARKET_PROMPTS[type]; if(!prompt) return;
   // クリップボードにコピー
@@ -6833,6 +6933,7 @@ function refreshCurrentScreen(){
   else if(n==='partners') renderPartnerList();
   else if(n==='market'){ initMarketPreviews(); try{renderSoubaBoard();}catch(e){} }
   else if(n==='sample') renderSample();
+  else if(n==='insight') renderInsight();
   else if(n==='order') renderOrder();
   else if(n==='docs') renderDocsScreen();
 }
@@ -7018,6 +7119,7 @@ function _sampleStep1(){
   return h;
 }
 
+function _rerenderStep1(){ loadSampleSpots(); var el=document.getElementById('sample-content'); if(el) el.innerHTML=_sampleStep1(); }
 function addSampleSpot(){
   loadSampleSpots();
   _inputDialog({title:'立ち寄り先の名前\n例：朝日園（本社）、朝日園（駐車場）、○○給油所',placeholder:'名前を入力',okText:'追加',onOk:function(name){
@@ -7025,21 +7127,21 @@ function addSampleSpot(){
     var id='spot_'+Date.now()+'_'+Math.floor(Math.random()*1000);
     sampleSpots.push({id:id,name:name,place:''}); saveSampleSpots();
     _sampleSel.spots[id]=true;
-    document.getElementById('sample-content').innerHTML=_sampleStep1();
+    _rerenderStep1();
   }});
 }
 function editSampleSpot(id){
   loadSampleSpots();
   var sp=sampleSpots.find(function(x){return x.id===id;}); if(!sp) return;
   _inputDialog({title:'立ち寄り先の名前を変更',value:sp.name,okText:'保存',allowDelete:true,
-    onOk:function(name){ name=(name||'').trim(); if(!name) return; sp.name=name; saveSampleSpots(); document.getElementById('sample-content').innerHTML=_sampleStep1(); },
-    onDelete:function(){ sampleSpots=sampleSpots.filter(function(x){return x.id!==id;}); delete _sampleSel.spots[id]; saveSampleSpots(); document.getElementById('sample-content').innerHTML=_sampleStep1(); }
+    onOk:function(name){ name=(name||'').trim(); if(!name) return; sp.name=name; saveSampleSpots(); _rerenderStep1(); },
+    onDelete:function(){ sampleSpots=sampleSpots.filter(function(x){return x.id!==id;}); delete _sampleSel.spots[id]; saveSampleSpots(); _rerenderStep1(); }
   });
 }
 
 function toggleSampleSel(grp,key){
   _sampleSel[grp][key]=!_sampleSel[grp][key];
-  document.getElementById('sample-content').innerHTML=_sampleStep1();
+  _rerenderStep1();
 }
 function sampleGoStep2(){
   var order=[];
@@ -7058,33 +7160,18 @@ function sampleGoStep2(){
 function _sampleStep2(){
   var d=_sampleDate();
   if(window._sampleArrive==null) window._sampleArrive='07:00';
-  if(window._sampleDwell==null) window._sampleDwell=3;
   var h='<div style="display:flex;align-items:center;gap:8px;padding-top:calc(env(safe-area-inset-top) + 6px);margin-bottom:10px;">'
     +'<button onclick="_sampleStep=1;renderSample();" style="display:inline-flex;align-items:center;gap:5px;color:var(--matcha);font-weight:700;font-size:15px;background:none;border:none;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>選び直す</button>'
     +'<span class="page-title" style="margin:0;font-size:24px;">回る順番</span></div>';
-  var home=getStartPlace();
   h+='<div class="card pad" style="margin-bottom:12px;">'
     +'<div style="font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;margin-bottom:8px;">到着目標から逆算</div>'
-    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
+    +'<div style="display:flex;gap:8px;">'
     +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);">日付</label><input type="date" id="sample-date" value="'+d+'" style="width:100%;padding:9px;font-size:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></div>'
-    +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);">最終到着の目標</label><input type="time" id="sample-arrive" value="'+window._sampleArrive+'" style="width:100%;padding:9px;font-size:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></div>'
-    +'</div>'
-    +'<div style="display:flex;align-items:center;gap:8px;">'
-    +'<span style="font-size:11px;color:var(--muted);white-space:nowrap;">🏠 出発地（自宅）</span>'
-    +'<span style="flex:1;font-size:13px;font-weight:600;color:'+(home?'var(--ink)':'var(--red)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(home?escText(home):'未登録')+'</span>'
-    +'<button onclick="editHomeAddr()" style="font-size:11px;border:1px solid var(--border);background:var(--surface);color:var(--matcha);font-weight:700;border-radius:10px;padding:5px 11px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">'+(home?'変更':'登録')+'</button>'
+    +'<div style="flex:1;"><label style="font-size:10px;color:var(--muted);">最終到着の目標</label><input type="time" id="sample-arrive" value="'+window._sampleArrive+'" onchange="computeSampleTimes()" style="width:100%;padding:9px;font-size:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></div>'
     +'</div></div>';
   h+='<div id="sample-result" style="margin-bottom:12px;"></div>';
-  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;"><span>訪問順・各区間の移動時間</span><button onclick="computeSampleTimes()" style="font-size:11px;border:1px solid var(--matcha);background:var(--matcha-light);color:var(--matcha);font-weight:800;border-radius:12px;padding:5px 12px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">⟳ 出発時刻を計算</button></div>';
-  h+='<div style="font-size:10px;color:var(--hint);margin:0 2px 8px;">移動時間は<b>地点の組み合わせ</b>で記憶されます。一度入れれば順番を変えても自動で当てはまります。</div>';
-  // 実測モードの操作
-  if(sampleLive&&sampleLive.active){
-    h+='<div style="display:flex;align-items:center;gap:8px;margin:4px 0 10px;padding:10px 12px;border-radius:12px;background:#fdeaea;border:1px solid #f0c4c4;">'
-      +'<span style="font-size:12px;font-weight:700;color:#c0392b;flex:1;">● 計測中（出発 '+_hm(new Date(sampleLive.t0).getHours()*60+new Date(sampleLive.t0).getMinutes())+'）各地点で着/発を押してください</span>'
-      +'<button onclick="endSampleLive()" style="padding:7px 12px;border-radius:9px;border:none;background:#c0392b;color:#fff;font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">■ 終了</button></div>';
-  } else {
-    h+='<button onclick="startSampleLive()" style="width:100%;margin:4px 0 10px;padding:12px;border-radius:12px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">▶ 計測しながら回る（実測を保存）</button>';
-  }
+  h+='<div class="section-label">訪問順・各区間の移動時間（分）</div>';
+  h+='<div style="font-size:10px;color:var(--hint);margin:0 2px 8px;line-height:1.6;">≡長押しドラッグ／▲▼で並べ替え。移動時間は<b>地点の組み合わせ</b>で記憶され、順番を変えても自動で当てはまります。回り終わったら実測値に直すと次回から正確になります。</div>';
   h+='<div class="rows" id="sample-route" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);">';
   _sampleOrder.forEach(function(it,i){
     var nd=_resolveNode(it.key); if(!nd) return;
@@ -7094,30 +7181,27 @@ function _sampleStep2(){
     var legVal=getLeg(prevKey,it.key);
     var av=isS?'📍':nd.name.replace(/[（(].*$/,'').slice(0,1);
     var avc=isP?'background:var(--matcha-light);color:var(--matcha);':isS?'background:var(--paper2);color:var(--muted);':'background:var(--gold-light);color:var(--gold);';
-    h+='<div class="sample-stop" data-idx="'+i+'" style="display:flex;align-items:center;gap:10px;padding:11px 12px;'+(i<_sampleOrder.length-1?'border-bottom:1px solid var(--border);':'')+'background:var(--surface);">'
+    h+='<div class="sample-stop" data-idx="'+i+'" style="display:flex;align-items:center;gap:9px;padding:11px 12px;'+(i<_sampleOrder.length-1?'border-bottom:1px solid var(--border);':'')+'background:var(--surface);">'
       +'<span style="color:var(--hint);font-size:15px;flex:none;">≡</span>'
       +'<span style="width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;" class="num">'+(i+1)+'</span>'
-      +'<span style="width:32px;height:32px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;'+avc+'">'+av+'</span>'
+      +'<span style="width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;'+avc+'">'+av+'</span>'
       +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nd.name+'<span style="font-size:10px;font-weight:600;color:'+stopCol+';margin-left:5px;">'+stopTag+'</span></span>'
-      +'<span onclick="setSamplePlace(\''+it.key+'\')" style="font-size:11px;color:'+(nd.place?'var(--muted)':'var(--red)')+';cursor:pointer;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(nd.place?'📍 '+escText(nd.place):'📍 場所を登録')+'</span>'
-      +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span>'
-      +((sampleLive&&sampleLive.active)?('<span style="display:flex;gap:6px;margin-top:6px;">'
-          +'<button onclick="event.stopPropagation();sampleArrive('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid '+((sampleLive.arr[i]!=null)?'var(--matcha)':'var(--border2)')+';background:'+((sampleLive.arr[i]!=null)?'var(--matcha)':'var(--surface)')+';color:'+((sampleLive.arr[i]!=null)?'#fff':'var(--ink2)')+';font-size:12px;font-weight:700;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">着'+((sampleLive.arr[i]!=null)?' '+_hm(new Date(sampleLive.arr[i]).getHours()*60+new Date(sampleLive.arr[i]).getMinutes()):'')+'</button>'
-          +'<button onclick="event.stopPropagation();sampleDepart('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid '+((sampleLive.dep[i]!=null)?'var(--gold)':'var(--border2)')+';background:'+((sampleLive.dep[i]!=null)?'var(--gold)':'var(--surface)')+';color:'+((sampleLive.dep[i]!=null)?'#fff':'var(--ink2)')+';font-size:12px;font-weight:700;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">発'+((sampleLive.dep[i]!=null)?' '+_hm(new Date(sampleLive.dep[i]).getHours()*60+new Date(sampleLive.dep[i]).getMinutes()):'')+'</button></span>'):'')
-      +'</span>'
-      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:52px;"><span style="font-size:9px;color:var(--hint);">'+(i===0?'自宅→':'移動')+'分</span>'
-      +'<input type="number" inputmode="numeric" value="'+(legVal!=null?legVal:'')+'" onchange="setLegVal(\''+prevKey+'\',\''+it.key+'\',this.value);computeSampleTimes();" placeholder="分" style="width:48px;padding:6px 3px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
-      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:46px;"><span style="font-size:9px;color:var(--hint);">滞在分</span>'
-      +'<input type="number" inputmode="numeric" value="'+getDwell(it.key)+'" onchange="setDwellVal(\''+it.key+'\',this.value);computeSampleTimes();" style="width:44px;padding:6px 3px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
+      +'<span id="sample-time-'+i+'" style="font-size:11px;color:var(--matcha);font-weight:700;display:block;"></span></span>'
+      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:54px;"><span style="font-size:9px;color:var(--hint);">'+(i===0?'自宅→':'移動')+'分</span>'
+      +'<input type="number" inputmode="numeric" value="'+(legVal!=null?legVal:'')+'" onchange="setLegVal(\''+prevKey+'\',\''+it.key+'\',this.value);computeSampleTimes();" placeholder="分" style="width:50px;padding:7px 3px;text-align:center;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
+      +'<span style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:48px;"><span style="font-size:9px;color:var(--hint);">滞在分</span>'
+      +'<input type="number" inputmode="numeric" value="'+getDwell(it.key)+'" onchange="setDwellVal(\''+it.key+'\',this.value);computeSampleTimes();" style="width:46px;padding:7px 3px;text-align:center;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;"></span>'
+      +'<span style="display:inline-flex;flex-direction:column;gap:2px;flex:none;"><button onclick="moveSampleStop('+i+',-1)" style="width:24px;height:18px;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--muted);font-size:9px;cursor:pointer;padding:0;">▲</button><button onclick="moveSampleStop('+i+',1)" style="width:24px;height:18px;border:1px solid var(--border);background:var(--surface);border-radius:6px;color:var(--muted);font-size:9px;cursor:pointer;padding:0;">▼</button></span>'
       +'</div>';
   });
   h+='</div>';
-  h+='<button onclick="openSampleMap()" style="width:100%;margin-top:18px;padding:15px;border-radius:16px;border:none;background:#1a73e8;color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(26,115,232,.3);">🗺 Googleマップでルートを開く</button>';
-  h+='<div style="font-size:11px;color:var(--hint);text-align:center;margin-top:6px;line-height:1.6;">開いたGoogleマップで出発時刻を翌朝に設定すると、その時刻の予測で所要時間が出ます。早朝は渋滞の影響が小さいので目安になります。</div>';
-  h+='<button onclick="saveSampleRound()" style="width:100%;margin-top:12px;padding:14px;border-radius:16px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">💾 この回り方を記録（カレンダーに残す）</button>';
+  h+='<button onclick="saveSampleRound()" style="width:100%;margin-top:18px;padding:15px;border-radius:16px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 6px 16px rgba(52,104,74,.3);">💾 この回り方を記録（カレンダーに残す）</button>';
   return h;
 }
 
+/* 旧：地図連携・実測ボタンは廃止（last-write-winsの実測入力に一本化） */
+var sampleLive=null;
+function loadSampleLive(){ sampleLive=null; }
 var sampleLive=null;
 function loadSampleLive(){ try{ sampleLive=JSON.parse(_safeLS.getItem('ocha_sample_live')||'null'); }catch(e){ sampleLive=null; } }
 function saveSampleLive(){ try{ if(sampleLive) _safeLS.setItem('ocha_sample_live', JSON.stringify(sampleLive)); else _safeLS.removeItem('ocha_sample_live'); }catch(e){} }
@@ -7217,20 +7301,7 @@ function _placeQuery(nd){
   if(place && /^https?:\/\//.test(place)) return null; // 座標を取り出せないURLは使えない
   return encodeURIComponent(nd.name.replace(/（[^）]*）/g,'')+' 静岡県島田市');
 }
-function openSampleMap(){
-  var pts=[];
-  var start=getStartPlace();
-  if(start) pts.push(encodeURIComponent(start));
-  var unresolved=[];
-  _sampleOrder.forEach(function(it){ var nd=_resolveNode(it.key); if(nd){ var q=_placeQuery(nd); if(q==null){ unresolved.push(nd.name); q=encodeURIComponent(nd.name); } pts.push(q); } });
-  if(unresolved.length){ alert('次の場所はGoogleマップのリンクから位置を特定できませんでした。\n\n'+unresolved.join('、')+'\n\n「📍場所を登録」で住所、または「緯度,経度」（例：34.836,138.176）で登録すると正確にルートが出ます。'); }
-  if(pts.length<2){ toast('2か所以上必要です'); return; }
-  var origin=pts[0], destination=pts[pts.length-1];
-  var waypoints=pts.slice(1,-1).join('%7C');
-  var url='https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+origin+'&destination='+destination+(waypoints?'&waypoints='+waypoints:'');
-  saveSampleRound(true);
-  window.open(url,'_blank');
-}
+function openSampleMap(){}
 function saveSampleRound(silent){
   loadSampleRounds(); loadSampleLegs();
   var date=_sampleDate();
@@ -7242,8 +7313,12 @@ function saveSampleRound(silent){
   var legsArr=_sampleOrder.map(function(it,i){ var prev=(i===0)?'START':_sampleOrder[i-1].key; return getLeg(prev,it.key)||0; });
   var dwArr=_sampleOrder.map(function(it){ return getDwell(it.key); });
   var totalLeg=legsArr.reduce(function(a,b){return a+b;},0); var totalDwell=0; for(var k=0;k<dwArr.length-1;k++) totalDwell+=(dwArr[k]||0);
-  var departCalc=(target!=null)?_hm(target-(totalLeg+totalDwell)):'';
-  var stops=_sampleOrder.map(function(it){ var nd=_resolveNode(it.key); return {type:it.type,key:it.key,name:nd?nd.name:'',place:nd?nd.place:''}; });
+  var start_m=(target!=null)?target-(totalLeg+totalDwell):null;
+  var departCalc=(start_m!=null)?_hm(start_m):'';
+  // 各地点の着・発時刻を逆算
+  var cur=start_m, stopTimes=[];
+  for(var si=0;si<_sampleOrder.length;si++){ if(cur==null){stopTimes.push({a:'',d:''});continue;} cur+=(legsArr[si]||0); var aMin=cur; var dMin=aMin+(si<_sampleOrder.length-1?(dwArr[si]||0):0); stopTimes.push({a:_hm(aMin),d:(si<_sampleOrder.length-1?_hm(dMin):'')}); cur=dMin; }
+  var stops=_sampleOrder.map(function(it,idx){ var nd=_resolveNode(it.key); return {type:it.type,key:it.key,name:nd?nd.name:'',place:nd?nd.place:'',leg:(legsArr[idx]||0),dwell:(dwArr[idx]||0),arrive:stopTimes[idx].a,depart:stopTimes[idx].d}; });
   sampleRounds[date]={date:date,arriveTarget:arrive,departTime:departCalc,start:start,stops:stops,savedAt:new Date().toISOString()};
   saveSampleRounds();
   if(!silent) toast('カレンダーに記録しました');
