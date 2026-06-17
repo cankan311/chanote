@@ -1150,7 +1150,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.03-AY</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.03-AZ</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1825,7 +1825,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.03-AY</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.03-AZ</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -6112,10 +6112,48 @@ function renderOverviewCharts(){
 }
 
 /* ===== 生産家別グラフ（ECharts） ===== */
+
+function renderAllProducersCharts(ft){
+  var pc=ecInit('producer-price-chart'); var qc=ecInit('producer-qty-chart');
+  if(!ft.length){
+    [pc,qc].forEach(function(c){ if(c) c.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); });
+    return;
+  }
+  function gname(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  var dset={},dates=[]; ft.forEach(function(t){ if(t.date&&!dset[t.date]){dset[t.date]=1;dates.push(t.date);} }); dates.sort();
+  var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
+  var groups={};
+  ft.forEach(function(t){ var g=gname(t); if(!groups[g])groups[g]={}; if(!groups[g][t.date])groups[g][t.date]={q:0,a:0}; groups[g][t.date].q+=(t.totalQty||0); groups[g][t.date].a+=tradeAmount(t); });
+  var names=Object.keys(groups);
+  var priceSeries=names.map(function(g,i){
+    return {name:g,type:'line',connectNulls:true,smooth:0.3,symbolSize:6,
+      data:dates.map(function(d){ var c=groups[g][d]; return (c&&c.q>0)?Math.round(c.a/c.q):null; }),
+      lineStyle:{width:2},itemStyle:{color:EC_PALETTE[i%EC_PALETTE.length]}};
+  });
+  var qtySeries=names.map(function(g,i){
+    return {name:g,type:'bar',stack:'total',
+      data:dates.map(function(d){ var c=groups[g][d]; return (c&&c.q>0)?Math.round(c.q):null; }),
+      itemStyle:{color:EC_PALETTE[i%EC_PALETTE.length]}};
+  });
+  var legendOpt={type:'scroll',top:0,textStyle:{fontSize:10,fontFamily:EC_FONT},itemWidth:14,itemHeight:9,pageIconSize:10};
+  if(pc){ pc.setOption({ animationDuration:400, color:EC_PALETTE, textStyle:{fontFamily:EC_FONT},
+    tooltip:{trigger:'axis',valueFormatter:function(v){return v==null?'—':Math.round(v).toLocaleString()+'円/kg';}},
+    legend:legendOpt, grid:{left:8,right:8,top:30,bottom:46,containLabel:true}, dataZoom:ecZoomXY(),
+    xAxis:ecAxisX(labels), yAxis:ecAxisY(function(v){return v.toLocaleString();}), series:priceSeries }); }
+  if(qc){ qc.setOption({ animationDuration:400, color:EC_PALETTE, textStyle:{fontFamily:EC_FONT},
+    tooltip:{trigger:'axis',valueFormatter:function(v){return v==null?'—':ecKg(v);}},
+    legend:legendOpt, grid:{left:8,right:8,top:30,bottom:46,containLabel:true}, dataZoom:ecZoomXY(),
+    xAxis:ecAxisX(labels), yAxis:ecAxisY(ecKg), series:qtySeries }); }
+}
+
 function renderProducerChartsEc(){
   if(typeof echarts==='undefined') return;
   // タブ全体のフィルターに従う。生産家未指定なら、データのある先頭の生産家を表示。
   var ft=getFilteredTrades().filter(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); return p && p.type==='producer'; });
+
+  // 「全生産家」のときは生産家ごとに線を重ねて表示（凡例でON/OFF）
+  if(analyzeProducer==='all'){ renderAllProducersCharts(ft); return; }
+
   var pid;
   if(analyzeProducer!=='all'){ pid=parseInt(analyzeProducer); }
   else {
