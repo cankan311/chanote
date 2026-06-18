@@ -7045,9 +7045,9 @@ function openDaySummary(date){
   _renderDaySummary(_daySumDate);
 }
 
-// その生産家の、指定日より前の直近取引
-function _prevProdTrade(pid, date){
-  var arr=trades.filter(function(t){ return String(t.producerId)===String(pid) && (t.date||'')<date; })
+// その「生産家×茶商」の組み合わせで、指定日より前の直近取引
+function _prevTrade(pid, bid, date){
+  var arr=trades.filter(function(t){ return String(t.producerId)===String(pid) && String(t.buyerId)===String(bid) && (t.date||'')<date; })
     .sort(function(a,b){ return (b.date||'').localeCompare(a.date||'')||((b.id||0)-(a.id||0)); });
   return arr[0]||null;
 }
@@ -7092,7 +7092,7 @@ function _renderDaySummary(date){
         +'<div style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;background:var(--surface);">';
       list.forEach(function(t,i){
         var prod=partners.find(function(p){ return String(p.id)===String(t.producerId); });
-        var pv=_prevProdTrade(t.producerId, date);
+        var pv=_prevTrade(t.producerId, t.buyerId, date);
         var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean).join('、');
         var price=(t.price!=null?t.price:0);
         var qty=(t.totalQty!=null?t.totalQty:0);
