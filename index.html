@@ -1656,7 +1656,7 @@ function showScreen(name, isBack){
   if(name==='home') renderHome();
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
-  if(name==='new-trade'){ window._prefilledPair=null; }
+  if(name==='new-trade'){ window._prefilledPair=null; _hidePrefillBanner(); }
   if(name==='sample') renderSample();
   if(name==='insight') renderInsight();
   if(name==='order') renderOrder();
@@ -2973,45 +2973,81 @@ function renderComponentSettings(){
 
 /* 仕入元を選んだら前回取引の内容を自動入力（金額・数量は除く） */
 function prefillFromPair(){
-  var pid=parseInt((document.getElementById('t-producer')||{}).value)||0;
-  var bid=parseInt((document.getElementById('t-buyer')||{}).value)||0;
-  if(!pid||!bid) return;            // 両方選ばれた時だけ反映
-  if(window._prefilledPair===pid+'_'+bid) return;  // 同じ組合せで二重反映しない
-  // この組合せの最新取引
-  var last=trades.filter(function(t){return t.producerId===pid && t.buyerId===bid;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;})[0];
-  if(!last){ return; }
-  window._prefilledPair=pid+'_'+bid;
+  var pSel=document.getElementById('t-producer');
+  var bSel=document.getElementById('t-buyer');
+  if(!pSel||!bSel) return;
+  var pid=pSel.value, bid=bSel.value;
+  if(!pid||!bid) return;            // 生産者と売先の両方が選ばれた時だけ反映
+  var key=pid+'_'+bid;
+  if(window._prefilledPair===key) return;  // 同じ組合せでの二重反映を防止
+  // この組合せの直近取引（IDが数値/文字列どちらでも一致するよう文字列で突き合わせ）
+  var matches=trades.filter(function(t){
+    return String(t.producerId)===String(pid) && String(t.buyerId)===String(bid);
+  }).sort(function(a,b){
+    return (b.date||'').localeCompare(a.date||'') || ((b.id||0)-(a.id||0));
+  });
+  var last=matches[0];
+  if(!last){ return; }              // 前回記録が無ければ何もしない
+  window._prefilledPair=key;
+
   // 品種
   var vsel=document.getElementById('t-variety');
-  if(vsel && last.variety){
-    if(!Array.prototype.some.call(vsel.options,function(o){return o.value===last.variety;})){ var op=document.createElement('option'); op.value=last.variety; op.textContent=last.variety; vsel.appendChild(op); }
-    vsel.value=last.variety;
+  if(vsel){
+    var vv=last.variety||'';
+    if(vv && !Array.prototype.some.call(vsel.options,function(o){return o.value===vv;})){
+      var op=document.createElement('option'); op.value=vv; op.textContent=vv; vsel.appendChild(op);
+    }
+    vsel.value=vv;
   }
   // 売値
-  var pr=document.getElementById('t-price'); if(pr && last.price!=null){ pr.value=last.price; }
-  // 粉引き
-  if(last.kobiki!=null){
-    var btns=document.querySelectorAll('#kobiki-btns .kobiki-btn'); var matched=false;
-    btns.forEach(function(b){ if(b.dataset.val!=='custom' && parseFloat(b.dataset.val)===last.kobiki){ selectKobiki(b); matched=true; } });
-    if(!matched && last.kobiki>0){ var cb=document.querySelector('#kobiki-btns .kobiki-btn[data-val="custom"]'); if(cb){ selectKobiki(cb); var ci=document.getElementById('t-kobiki-custom'); if(ci){ ci.value=last.kobiki; } } }
+  var pr=document.getElementById('t-price'); if(pr) pr.value=(last.price!=null?last.price:'');
+  // 粉引き（前回の率を選択。一致するボタンが無ければ手入力に）
+  var kob=(last.kobiki!=null?last.kobiki:0);
+  var btns=document.querySelectorAll('#kobiki-btns .kobiki-btn'); var matched=false;
+  btns.forEach(function(b){ if(b.dataset.val!=='custom' && parseFloat(b.dataset.val)===kob){ selectKobiki(b); matched=true; } });
+  if(!matched){
+    var cb=document.querySelector('#kobiki-btns .kobiki-btn[data-val="custom"]');
+    if(cb){ selectKobiki(cb); var ci=document.getElementById('t-kobiki-custom'); if(ci){ ci.value=kob; } }
   }
-  // 成分
-  if(last.components){ Object.keys(last.components).forEach(function(k){ var ci=document.getElementById('comp-'+k); if(ci&&last.components[k]!=null) ci.value=last.components[k]; }); }
-  // 荷口（荷印・数量・単価）を復元
+  // 成分（前回の値を反映。前回に無い項目は空に戻す）
+  components.forEach(function(c){
+    var cel=document.getElementById('comp-'+c); if(!cel) return;
+    cel.value=(last.components && last.components[c]!=null)?last.components[c]:'';
+  });
+  // 荷口（荷印・数量・単価）を前回の構成で復元
   var llist=document.getElementById('lot-list');
-  if(llist && last.lots && last.lots.length){
+  if(llist){
     llist.innerHTML=''; lotSeq=0;
-    last.lots.forEach(function(l){ addLot(); var id=lotSeq;
-      var mk=document.getElementById('lot-mark-'+id); if(mk) mk.value=l.mark||'';
-      var qy=document.getElementById('lot-qty-'+id); if(qy) qy.value=(l.qty!=null?l.qty:'');
-      var lp=document.getElementById('lot-price-'+id); if(lp) lp.value=(l.price!=null?l.price:'');
-    });
+    if(last.lots && last.lots.length){
+      last.lots.forEach(function(l){ addLot(); var id=lotSeq;
+        var mk=document.getElementById('lot-mark-'+id); if(mk) mk.value=l.mark||'';
+        var qy=document.getElementById('lot-qty-'+id); if(qy) qy.value=(l.qty!=null?l.qty:'');
+        var lp=document.getElementById('lot-price-'+id); if(lp) lp.value=(l.price!=null?l.price:'');
+      });
+    } else { addLot(); }
     updateGrandTotal();
   }
   try{ updateKobikiPreview(); }catch(e){}
   try{ liveCalc(); }catch(e){}
-  toast(last.date.slice(5).replace('-','/')+'の記録を反映。変わった所だけ直してください');
+
+  // 反映したことを画面に明示（「変わった所だけ直す」運用のため）
+  var prod=partners.find(function(p){return String(p.id)===String(pid);});
+  var buy=partners.find(function(p){return String(p.id)===String(bid);});
+  var banner=document.getElementById('prefill-banner');
+  if(!banner){
+    banner=document.createElement('div'); banner.id='prefill-banner';
+    banner.style.cssText='margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--matcha-light);color:var(--matcha);font-size:12px;font-weight:700;line-height:1.6;';
+    var dateField=document.getElementById('t-date');
+    var grp=dateField?dateField.closest('.field-group'):null;
+    if(grp&&grp.parentNode){ grp.parentNode.insertBefore(banner, grp.nextSibling); }
+  }
+  if(banner){
+    banner.style.display='block';
+    banner.textContent='✓ '+(prod?prod.name:'')+' → '+(buy?buy.name:'')+'：'+(last.date?last.date.slice(5).replace('-','/'):'')+' の記録を反映しました。変わった所だけ直して保存してください。';
+  }
+  toast('前回（'+(last.date?last.date.slice(5).replace('-','/'):'')+'）の記録を反映しました');
 }
+function _hidePrefillBanner(){ var b=document.getElementById('prefill-banner'); if(b) b.style.display='none'; }
 
 function renderComponentInputs(){
   var el=document.getElementById('component-inputs'); if(!el) return;
@@ -3214,6 +3250,7 @@ function saveTrade(){
   if(kp) kp.textContent='';
   components.forEach(function(c){var el=document.getElementById('comp-'+c);if(el)el.value='';});
   initLots();
+  window._prefilledPair=null; _hidePrefillBanner();
   renderAll(); showScreen('trades');
   var prod=partners.find(function(p){return p.id===producerId;});
   var buy=partners.find(function(p){return p.id===buyerId;});
