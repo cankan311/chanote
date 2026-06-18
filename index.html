@@ -676,8 +676,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
   <!-- 取引記録フォーム -->
   <div class="card">
     <div class="field-group"><label>📅 取引日</label><input type="date" id="t-date"></div>
-    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="prefillFromProducer();liveCalc()"><option value="">選択してください</option></select></div>
-    <div class="field-group"><label>🏪 売先</label><select id="t-buyer" onchange="liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>🌿 仕入元（生産家 / 茶商）</label><select id="t-producer" onchange="prefillFromPair();liveCalc()"><option value="">選択してください</option></select></div>
+    <div class="field-group"><label>🏪 売先</label><select id="t-buyer" onchange="prefillFromPair();liveCalc()"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>品種</label><select id="t-variety"><option value="">選択してください</option></select></div>
     <div class="field-group"><label>売値 (円/kg)</label><input type="number" id="t-price" placeholder="0" inputmode="numeric" oninput="updateKobikiPreview();liveCalc()"></div>
     <div class="section-label" style="margin-top:4px;">荷口・数量</div>
@@ -1155,7 +1155,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       📤 バックアップを保存する
     </button>
     <div id="backup-result" style="margin-top:8px;font-size:12px;"></div>
-    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.05-BC</div>
+    <div style="margin-top:14px;font-size:11px;color:var(--hint);text-align:center;">茶帳 v2026.07.06-BE</div>
 
     <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
 
@@ -1656,6 +1656,7 @@ function showScreen(name, isBack){
   if(name==='home') renderHome();
   if(name==='analyze') renderAnalyze();
   if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
+  if(name==='new-trade'){ window._prefilledPair=null; }
   if(name==='sample') renderSample();
   if(name==='insight') renderInsight();
   if(name==='order') renderOrder();
@@ -1831,7 +1832,7 @@ function renderDocSubmissions(el, season, docType){
 
   var pct = targetProducers.length > 0 ? Math.round(submitted/targetProducers.length*100) : 0;
 
-  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.05-BC</div>';
+  var html = '<div style="font-size:9px;color:var(--hint);text-align:right;margin-bottom:4px;">v2026.07.06-BE</div>';
   // サマリー
   html += '<div class="card" style="margin-bottom:14px;background:linear-gradient(135deg,var(--green-bg),var(--surface));">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -2971,32 +2972,45 @@ function renderComponentSettings(){
 }
 
 /* 仕入元を選んだら前回取引の内容を自動入力（金額・数量は除く） */
-function prefillFromProducer(){
+function prefillFromPair(){
   var pid=parseInt((document.getElementById('t-producer')||{}).value)||0;
-  if(!pid) return;
-  // この仕入元の最新取引
-  var last=trades.filter(function(t){return t.producerId===pid;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;})[0];
-  if(!last) return;
-  // 売先（空のときだけ自動。ユーザーが既に選んでいたら尊重）
-  var bsel=document.getElementById('t-buyer');
-  if(bsel && !bsel.value && last.buyerId){ bsel.value=last.buyerId; }
+  var bid=parseInt((document.getElementById('t-buyer')||{}).value)||0;
+  if(!pid||!bid) return;            // 両方選ばれた時だけ反映
+  if(window._prefilledPair===pid+'_'+bid) return;  // 同じ組合せで二重反映しない
+  // この組合せの最新取引
+  var last=trades.filter(function(t){return t.producerId===pid && t.buyerId===bid;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||b.id-a.id;})[0];
+  if(!last){ return; }
+  window._prefilledPair=pid+'_'+bid;
   // 品種
   var vsel=document.getElementById('t-variety');
-  if(vsel && !vsel.value && last.variety){
-    // optionが無ければ追加
-    if(!Array.prototype.some.call(vsel.options,function(o){return o.value===last.variety;})){
-      var op=document.createElement('option'); op.value=last.variety; op.textContent=last.variety; vsel.appendChild(op);
-    }
+  if(vsel && last.variety){
+    if(!Array.prototype.some.call(vsel.options,function(o){return o.value===last.variety;})){ var op=document.createElement('option'); op.value=last.variety; op.textContent=last.variety; vsel.appendChild(op); }
     vsel.value=last.variety;
   }
+  // 売値
+  var pr=document.getElementById('t-price'); if(pr && last.price!=null){ pr.value=last.price; }
   // 粉引き
   if(last.kobiki!=null){
     var btns=document.querySelectorAll('#kobiki-btns .kobiki-btn'); var matched=false;
     btns.forEach(function(b){ if(b.dataset.val!=='custom' && parseFloat(b.dataset.val)===last.kobiki){ selectKobiki(b); matched=true; } });
     if(!matched && last.kobiki>0){ var cb=document.querySelector('#kobiki-btns .kobiki-btn[data-val="custom"]'); if(cb){ selectKobiki(cb); var ci=document.getElementById('t-kobiki-custom'); if(ci){ ci.value=last.kobiki; } } }
   }
-  // 成分の項目名だけ前回に合わせて用意（数値は空のまま）
-  toast(last.date.slice(5).replace('-','/')+'の内容を引用（金額・数量は未入力）');
+  // 成分
+  if(last.components){ Object.keys(last.components).forEach(function(k){ var ci=document.getElementById('comp-'+k); if(ci&&last.components[k]!=null) ci.value=last.components[k]; }); }
+  // 荷口（荷印・数量・単価）を復元
+  var llist=document.getElementById('lot-list');
+  if(llist && last.lots && last.lots.length){
+    llist.innerHTML=''; lotSeq=0;
+    last.lots.forEach(function(l){ addLot(); var id=lotSeq;
+      var mk=document.getElementById('lot-mark-'+id); if(mk) mk.value=l.mark||'';
+      var qy=document.getElementById('lot-qty-'+id); if(qy) qy.value=(l.qty!=null?l.qty:'');
+      var lp=document.getElementById('lot-price-'+id); if(lp) lp.value=(l.price!=null?l.price:'');
+    });
+    updateGrandTotal();
+  }
+  try{ updateKobikiPreview(); }catch(e){}
+  try{ liveCalc(); }catch(e){}
+  toast(last.date.slice(5).replace('-','/')+'の記録を反映。変わった所だけ直してください');
 }
 
 function renderComponentInputs(){
@@ -6413,6 +6427,7 @@ function renderHome(){
     +_qa('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>','稼働表',"showScreen('calendar');showCalTab('gantt')")
     +_qa('<path d="M6 20V14M12 20V4M18 20v-6"/>','分析',"showScreen('analyze')")
     +'</div>';
+  h+='<button onclick="openDayDigest()" style="width:100%;margin-top:12px;padding:13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;gap:8px;">📑 前日のまとめを見る</button>';
 
   /* ---- ホーム：当月カレンダー ---- */
   h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
@@ -6984,6 +6999,83 @@ function refreshCurrentScreen(){
   },{passive:true});
   btn.addEventListener('touchcancel',reset,{passive:true});
 })();
+/* ===== 前日（指定日）のまとめ：見本回り・口銭を除く全情報 ===== */
+function openDayDigest(date){
+  var d = date || localDateStr(new Date(Date.now()-86400000));   // 既定は前日
+  _renderDayDigest(d);
+}
+function _renderDayDigest(date){
+  var old=document.getElementById('day-digest'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='day-digest';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;';
+  ov.onclick=function(){ ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation();" style="width:100%;max-width:460px;max-height:88vh;overflow-y:auto;background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25);padding:10px 16px calc(24px + env(safe-area-inset-bottom));">'
+    +'<div style="width:40px;height:5px;border-radius:3px;background:var(--border2);margin:8px auto 14px;"></div>'
+    + _dayDigestInner(date)
+    +'</div>';
+  document.body.appendChild(ov);
+}
+function _digestDateNav(date){
+  var prev=localDateStr(new Date(new Date(date+'T00:00:00').getTime()-86400000));
+  var next=localDateStr(new Date(new Date(date+'T00:00:00').getTime()+86400000));
+  var wd=['日','月','火','水','木','金','土'][new Date(date+'T00:00:00').getDay()];
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">'
+    +'<button onclick="_renderDayDigest(\''+prev+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">‹</button>'
+    +'<div style="text-align:center;"><div class="serif" style="font-size:19px;font-weight:700;">'+date.slice(5).replace("-","/")+'（'+wd+'）</div>'
+    +'<button onclick="(function(){var dd=document.getElementById(\'day-digest\');if(dd)dd.remove();homeOpenDay(\''+date+'\');})()" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;margin-top:2px;">この日をカレンダーで開く ›</button></div>'
+    +'<button onclick="_renderDayDigest(\''+next+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">›</button></div>';
+}
+function _dayDigestInner(date){
+  var h='<div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--matcha);text-align:center;margin-bottom:4px;">📑 その日のまとめ</div>';
+  h+=_digestDateNav(date);
+
+  // 取引（口銭は除外）
+  var ts=trades.filter(function(t){return t.date===date;});
+  if(ts.length){
+    var q=ts.reduce(function(a,t){return a+(t.totalQty||0);},0);
+    var amt=ts.reduce(function(a,t){return a+tradeAmount(t);},0);
+    h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>取引</span><span class="num" style="color:var(--hint);">'+ts.length+'件 ・ '+(q>=1000?(q/1000).toFixed(1)+'t':Math.round(q)+'kg')+' ・ '+Math.round(amt).toLocaleString()+'円</span></div>';
+    h+='<div class="card" style="padding:4px 14px;margin-bottom:6px;">';
+    ts.forEach(function(t,i){
+      var prod=partners.find(function(p){return p.id===t.producerId;});
+      var buy=partners.find(function(p){return p.id===t.buyerId;});
+      h+='<div onclick="(function(){var dd=document.getElementById(\'day-digest\');if(dd)dd.remove();showTradeDetail('+t.id+');})()" style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'cursor:pointer;">'
+        +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;">'+(prod?prod.name:'—')+' <span style="color:var(--hint);">→</span> '+(buy?buy.name:'—')+'</span>'
+        +'<span style="font-size:11px;color:var(--muted);">'+(t.variety||'')+' ・ '+fmt(t.totalQty||0)+'kg ・ '+(t.price||0).toLocaleString()+'円/kg</span></span>'
+        +'<span class="num" style="font-size:14px;font-weight:800;flex:none;">'+Math.round(tradeAmount(t)).toLocaleString()+'</span></div>';
+    });
+    h+='</div>';
+  }
+
+  // 稼働（誰が動いたか＝取引のあった生産家 ＋ 手動△）
+  try{
+    loadActivityLog();
+    var movers={};
+    ts.forEach(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(p&&p.type==='producer') movers[docCanonName?docCanonName(p.name):p.name]=1; });
+    var manual=activityLog[date]||{};
+    Object.keys(manual).forEach(function(pid){ if(manual[pid]==='worked'){ var p=partners.find(function(x){return String(x.id)===String(pid);}); if(p) movers[(docCanonName?docCanonName(p.name):p.name)+'（稼働）']=1; } });
+    var mk=Object.keys(movers);
+    if(mk.length){ h+='<div class="section-label">稼働した生産家</div><div class="card pad" style="margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.7;">'+mk.join('、')+'</div>'; }
+  }catch(e){}
+
+  // メモ（その日）
+  loadMemos();
+  var dms=allMemos.filter(function(m){return m.date===date;});
+  if(dms.length){
+    h+='<div class="section-label">メモ</div><div class="card" style="padding:4px 14px;margin-bottom:6px;">';
+    dms.forEach(function(m,i){
+      h+='<div style="padding:9px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'">'
+        +(m.tags&&m.tags.length?'<span style="font-size:10px;font-weight:700;color:var(--gold);">'+m.tags.join(' / ')+'</span><br>':'')
+        +'<span style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">'+escText(m.body||'')+'</span></div>';
+    });
+    h+='</div>';
+  }
+
+  if(!ts.length && !dms.length){ h+='<div class="card pad" style="text-align:center;color:var(--muted);padding:28px 16px;">この日の記録はありません</div>'; }
+  h+='<button onclick="document.getElementById(\'day-digest\').remove();" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">閉じる</button>';
+  return h;
+}
+
 function openFabMenu(){
   // タップ時はミニメニュー（記録/メモ）を表示
   if(document.getElementById('fab-menu')){ closeFabMenu(); return; }
@@ -6991,7 +7083,8 @@ function openFabMenu(){
   ov.style.cssText='position:fixed;inset:0;z-index:850;';
   ov.innerHTML='<div style="position:fixed;right:18px;bottom:calc(186px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;align-items:flex-end;">'
     +'<button onclick="event.stopPropagation();closeFabMenu();showScreen(\'new-trade\')" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#34684a;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(52,104,74,.4);">✏️ 取引を記録</button>'
-    +'<button onclick="event.stopPropagation();closeFabMenu();openMemoModal()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#f57c00;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(245,124,0,.4);">📝 メモ</button></div>';
+    +'<button onclick="event.stopPropagation();closeFabMenu();openMemoModal()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#f57c00;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(245,124,0,.4);">📝 メモ</button>'
+    +'<button onclick="event.stopPropagation();closeFabMenu();openDayDigest()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#1a1a18;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35);">📑 前日まとめ</button></div>';
   document.body.appendChild(ov);
 }
 function closeFabMenu(){ var m=document.getElementById('fab-menu'); if(m) m.remove(); }
