@@ -797,10 +797,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff9800;"></span> メモ</span>
       </div>
     </div>
-    <div id="cal-weather-section" style="display:none;margin-bottom:4px;">
-      <div id="cal-weather-content"></div>
-    </div>
-    <div id="cal-tx-list"></div>
     <div id="cal-teai-section" style="display:none;">
       <div class="section-label">手合わせ帳</div>
       <div id="cal-teai-images"></div>
@@ -808,34 +804,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
         📸 この日の手合わせ帳を追加する
         <input type="file" accept="image/*" multiple style="display:none;" onchange="addTeaiImage(this)">
       </label>
-      <div class="section-label" style="margin-top:16px;">🚫 この日の休み記録</div>
-      <div id="cal-rest-list"></div>
-      <div class="card" style="padding:14px;margin-top:8px;">
-        <div class="field-group" style="margin-bottom:10px;">
-          <label>生産家</label>
-          <select id="cal-rest-producer" style="width:100%;padding:10px 12px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;">
-            <option value="">選択してください</option>
-          </select>
-        </div>
-        <div class="field-group" style="margin-bottom:10px;">
-          <label>茶期</label>
-          <select id="cal-rest-season" style="width:100%;padding:10px 12px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;">
-            <option value="">選択してください</option>
-          </select>
-        </div>
-        <div class="field-group" style="margin-bottom:10px;">
-          <label>理由</label>
-          <select id="cal-rest-reason-sel" onchange="toggleRestReason()" style="width:100%;padding:10px 12px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:8px;">
-            <option value="">選択してください</option>
-            <option value="雨天">雨天</option>
-            <option value="機械故障">機械故障</option>
-            <option value="体調不良">体調不良</option>
-            <option value="その他">その他（自由入力）</option>
-          </select>
-          <input type="text" id="cal-rest-reason-txt" placeholder="理由を入力..." style="display:none;width:100%;padding:10px 12px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;outline:none;">
-        </div>
-        <button class="btn-primary" onclick="addRestDay()" style="margin-top:0;">＋ 休みを記録する</button>
-      </div>
+    </div>
+    <div id="cal-tx-list"></div>
+    <div id="cal-weather-section" style="display:none;margin-top:4px;">
+      <div id="cal-weather-content"></div>
     </div>
   </div>
   <!-- 稼働ガントビュー -->
@@ -3728,9 +3700,9 @@ function renderCalendar(){
       });
     });
     var inner='';
-    inner+=renderSampleRoundForDate(selectedDate);
-    if(rows) inner+='<div class="section-label">'+selectedDate+' の取引</div>'+rows;
-    inner+=renderDayMemos(selectedDate);
+    inner+=renderDayMemos(selectedDate);                                              // メモ
+    if(rows) inner+='<div class="section-label">'+selectedDate+' の取引</div>'+rows;     // 取引
+    inner+=renderSampleRoundForDate(selectedDate);                                     // 見本回り
     txListEl.innerHTML=inner;
   } else {
     txListEl.innerHTML='';
@@ -4244,8 +4216,6 @@ function renderCalTeai(){
   if(!sec||!imgEl) return;
   if(!selectedDate){sec.style.display='none';return;}
   sec.style.display='block';
-  renderCalRestSelects();
-  renderCalRestList();
   var imgs=teaiImages[selectedDate]||[];
   if(!imgs.length){imgEl.innerHTML='<div style="font-size:13px;color:var(--hint);padding:8px 0;">この日の手合わせ帳はありません</div>';return;}
   imgEl.innerHTML=imgs.map(function(img,i){
@@ -6721,6 +6691,12 @@ function shareTradeImage(id){
   var t0=trades.find(function(x){return x.id===id;}); if(!t0) return;
   shareDayImage(t0.date, t0.producerId);   // その生産者のその日の取引のみ
 }
+function _txtDelta(cur, prev, dec){
+  if(cur==null||prev==null||isNaN(cur)||isNaN(prev)) return '';
+  var d=cur-prev;
+  if(Math.abs(d)<1e-9) return '±0';
+  return (d>0?'+':'-')+Math.abs(d).toLocaleString(undefined,{maximumFractionDigits:dec});
+}
 function shareDayImage(date, producerId){
   var list=trades.filter(function(t){return t.date===date && (producerId==null || String(t.producerId)===String(producerId));})
     .slice().sort(function(a,b){
@@ -6737,7 +6713,7 @@ function shareDayImage(date, producerId){
 
   var W=820, pad=28, line=30;
   // 行数見積り
-  var bodyLines=0; list.forEach(function(t){ bodyLines += 1 + Math.max(1,(t.lots||[]).length) + (compKeys.length?1:0) + 1; });
+  var bodyLines=0; list.forEach(function(t){ bodyLines += 1 + Math.max(1,(t.lots||[]).length) + (compKeys.length?1:0) + 2; });
   var H=150 + bodyLines*line + 120;
   var c=document.createElement('canvas'); c.width=W; c.height=H;
   var x=c.getContext('2d');
@@ -6778,6 +6754,21 @@ function shareDayImage(date, producerId){
       var cs=compKeys.filter(function(k){return t.components&&t.components[k]!==undefined&&!isNaN(t.components[k]);})
         .map(function(k){return k+':'+t.components[k];});
       if(cs.length){ x.fillStyle='#8a6a2a'; x.font='400 16px "Noto Sans JP",sans-serif'; x.fillText('　　🔬 '+cs.join('　'),pad,y); y+=line; }
+    }
+    // 前回比（同じ生産家×茶商の前回取引との差）
+    var pv=_prevTrade(t.producerId, t.buyerId, t.date);
+    if(pv){
+      var dl=[];
+      if((t.price||0)>0 && (pv.price||0)>0){ var dpz=_txtDelta(t.price,pv.price,0); if(dpz) dl.push('値'+dpz); }
+      var dqz=_txtDelta(t.totalQty||0, pv.totalQty||0,1); if(dqz) dl.push('量'+dqz+'kg');
+      if(compKeys.length){
+        compKeys.forEach(function(k){
+          if(t.components&&t.components[k]!=null&&!isNaN(t.components[k]) && pv.components&&pv.components[k]!=null&&!isNaN(pv.components[k])){
+            var dcz=_txtDelta(Number(t.components[k]),Number(pv.components[k]),2); if(dcz) dl.push(k+dcz);
+          }
+        });
+      }
+      if(dl.length){ x.fillStyle='#9a7b34'; x.font='400 15px "Noto Sans JP",sans-serif'; x.fillText('　　📊 前回比 '+dl.join('　'),pad,y); y+=line; }
     }
     y+=6;
   });
