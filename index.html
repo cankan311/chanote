@@ -6464,7 +6464,7 @@ function renderHome(){
     +_qa('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>','稼働表',"showScreen('calendar');showCalTab('gantt')")
     +_qa('<path d="M6 20V14M12 20V4M18 20v-6"/>','分析',"showScreen('analyze')")
     +'</div>';
-  h+='<button onclick="openDayDigest()" style="width:100%;margin-top:12px;padding:13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;gap:8px;">📑 前日のまとめを見る</button>';
+  h+='<button onclick="openDaySummary()" style="width:100%;margin-top:12px;padding:13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;gap:8px;">📑 前日のまとめを見る</button>';
 
   /* ---- ホーム：当月カレンダー ---- */
   h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
@@ -6655,7 +6655,7 @@ function renderHomeCalendar(){
     if(hasTx) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--matcha);"></span>';
     if(hasMemo) dots+='<span style="width:5px;height:5px;border-radius:50%;background:#ff9800;"></span>';
     if(hasTeai) dots+='<span style="width:5px;height:5px;border-radius:50%;background:var(--gold);"></span>';
-    H+='<div onclick="homeOpenDay(\''+ds+'\')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;cursor:pointer;'
+    H+='<div onclick="openDaySummary(\''+ds+'\')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;cursor:pointer;'
       +(isT?'background:var(--matcha);color:#fff;font-weight:800;':'color:var(--ink);')+'">'
       +'<span class="num" style="font-size:13px;">'+d+'</span>'
       +'<span style="display:flex;gap:2px;height:5px;">'+(isT?'':dots)+'</span></div>';
@@ -7031,122 +7031,118 @@ function refreshCurrentScreen(){
     active=false;
     if(fired==='up'){ if(navigator.vibrate)navigator.vibrate(6); showScreen('new-trade'); }
     else if(fired==='left'){ if(navigator.vibrate)navigator.vibrate(6); openMemoModal(); }
-    else if(!moved){ /* タップ：メニューを開く */ openFabMenu(); }
+    else if(!moved){ /* タップ：前日のサマリーを開く */ openDaySummary(); }
     dir=null;
   },{passive:true});
   btn.addEventListener('touchcancel',reset,{passive:true});
 })();
-/* ===== 前日（指定日）のまとめ：見本回り・口銭を除く全情報 ===== */
-function openDayDigest(date){
-  var d = date || localDateStr(new Date(Date.now()-86400000));   // 既定は前日
-  _renderDayDigest(d);
+/* ===== 指定日サマリー：茶商別・前回差つき（旧「前日まとめ」を置き換え） ===== */
+var BUYER_ORDER=['ハラダ製茶','高森製茶','朝日園','石川製茶','丸七製茶','中村茶商'];
+var _daySumDate=null;
+
+function openDaySummary(date){
+  _daySumDate = date || localDateStr(new Date(Date.now()-86400000));  // 既定は前日
+  _renderDaySummary(_daySumDate);
 }
-function _renderDayDigest(date){
-  var old=document.getElementById('day-digest'); if(old) old.remove();
-  var ov=document.createElement('div'); ov.id='day-digest';
-  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;';
-  ov.onclick=function(){ ov.remove(); };
-  ov.innerHTML='<div onclick="event.stopPropagation();" style="width:100%;max-width:460px;max-height:88vh;overflow-y:auto;background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.25);padding:10px 16px calc(24px + env(safe-area-inset-bottom));">'
-    +'<div style="width:40px;height:5px;border-radius:3px;background:var(--border2);margin:8px auto 14px;"></div>'
-    + _dayDigestInner(date)
-    +'</div>';
-  document.body.appendChild(ov);
+
+// その生産家の、指定日より前の直近取引
+function _prevProdTrade(pid, date){
+  var arr=trades.filter(function(t){ return String(t.producerId)===String(pid) && (t.date||'')<date; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||'')||((b.id||0)-(a.id||0)); });
+  return arr[0]||null;
 }
-function _digestDateNav(date){
+// 前回差（プラス/マイナス）。prevが無い→空、同値→±0
+function _dsDelta(cur, prev, dec){
+  if(cur==null||prev==null||isNaN(cur)||isNaN(prev)) return '';
+  var d=cur-prev;
+  if(Math.abs(d)<1e-9) return '<span style="color:var(--hint);font-weight:600;"> ±0</span>';
+  var sign=d>0?'+':'-';
+  var col=d>0?'#2e7d32':'#c0392b';
+  return '<span style="color:'+col+';font-weight:800;"> '+sign+Math.abs(d).toLocaleString(undefined,{maximumFractionDigits:dec})+'</span>';
+}
+
+function _renderDaySummary(date){
+  _daySumDate=date;
+  var old=document.getElementById('day-summary'); if(old) old.remove();
+  var wd=['日','月','火','水','木','金','土'][new Date(date+'T00:00:00').getDay()];
   var prev=localDateStr(new Date(new Date(date+'T00:00:00').getTime()-86400000));
   var next=localDateStr(new Date(new Date(date+'T00:00:00').getTime()+86400000));
-  var wd=['日','月','火','水','木','金','土'][new Date(date+'T00:00:00').getDay()];
-  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
-    +'<button onclick="_renderDayDigest(\''+prev+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">‹</button>'
-    +'<div style="text-align:center;"><div class="serif" style="font-size:19px;font-weight:700;">'+date.slice(5).replace("-","/")+'（'+wd+'）</div>'
-    +'<button onclick="(function(){var dd=document.getElementById(\'day-digest\');if(dd)dd.remove();homeOpenDay(\''+date+'\');})()" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;margin-top:2px;">この日をカレンダーで開く ›</button></div>'
-    +'<button onclick="_renderDayDigest(\''+next+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">›</button></div>'
-    +'<label style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted);"><span>📅 日付を選んで移動</span>'
-    +'<input type="date" value="'+date+'" onchange="if(this.value)_renderDayDigest(this.value)" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-family:inherit;"></label>';
-}
-function _dayDigestInner(date){
-  var h='<div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--matcha);text-align:center;margin-bottom:4px;">📑 その日のまとめ</div>';
-  h+=_digestDateNav(date);
 
-  // 取引（口銭は除外）
-  var ts=trades.filter(function(t){return t.date===date;});
-  if(ts.length){
-    var q=ts.reduce(function(a,t){return a+(t.totalQty||0);},0);
-    var amt=ts.reduce(function(a,t){return a+tradeAmount(t);},0);
-    h+='<div class="section-label" style="display:flex;justify-content:space-between;"><span>取引</span><span class="num" style="color:var(--hint);">'+ts.length+'件 ・ '+(q>=1000?(q/1000).toFixed(1)+'t':Math.round(q)+'kg')+' ・ '+Math.round(amt).toLocaleString()+'円</span></div>';
-    h+='<div class="card" style="padding:4px 14px;margin-bottom:6px;">';
-    ts.forEach(function(t,i){
-      var prod=partners.find(function(p){return p.id===t.producerId;});
-      var buy=partners.find(function(p){return p.id===t.buyerId;});
-      h+='<div onclick="(function(){var dd=document.getElementById(\'day-digest\');if(dd)dd.remove();showTradeDetail('+t.id+');})()" style="display:flex;align-items:center;gap:10px;padding:10px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'cursor:pointer;">'
-        +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;">'+(prod?prod.name:'—')+' <span style="color:var(--hint);">→</span> '+(buy?buy.name:'—')+'</span>'
-        +'<span style="font-size:11px;color:var(--muted);">'+(t.variety||'')+' ・ '+fmt(t.totalQty||0)+'kg ・ '+(t.price||0).toLocaleString()+'円/kg</span></span>'
-        +'<span class="num" style="font-size:14px;font-weight:800;flex:none;">'+Math.round(tradeAmount(t)).toLocaleString()+'</span></div>';
-    });
-    h+='</div>';
-  }
+  var dayTrades=trades.filter(function(t){ return t.date===date; });
 
-  // 稼働（誰が動いたか＝取引のあった生産家 ＋ 手動△）
-  var moversCount=0;
-  try{
-    loadActivityLog();
-    var movers={};
-    ts.forEach(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(p&&p.type==='producer') movers[docCanonName?docCanonName(p.name):p.name]=1; });
-    var manual=activityLog[date]||{};
-    Object.keys(manual).forEach(function(pid){ if(manual[pid]==='worked'){ var p=partners.find(function(x){return String(x.id)===String(pid);}); if(p) movers[(docCanonName?docCanonName(p.name):p.name)+'（稼働）']=1; } });
-    var mk=Object.keys(movers); moversCount=mk.length;
-    if(mk.length){ h+='<div class="section-label">稼働した生産家</div><div class="card pad" style="margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.7;">'+mk.join('、')+'</div>'; }
-  }catch(e){}
-
-  // 注文（その日）
-  loadOrders();
-  var dos=orders.filter(function(o){return o.date===date;});
-  if(dos.length){
-    h+='<div class="section-label">注文</div><div class="card" style="padding:4px 14px;margin-bottom:6px;">';
-    dos.forEach(function(o,i){
-      var prod=partners.find(function(p){return p.id===o.producerId;});
-      var sub=[]; if(o.variety) sub.push(o.variety); if(o.priceMemo) sub.push((o.priceMemo).toLocaleString()+'円目安'); if(o.memo) sub.push(escText(o.memo));
-      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'">'
-        +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;">'+(o.buyer||'—')+' <span style="color:var(--hint);">←</span> '+(prod?prod.name:'—')+'</span>'
-        +(sub.length?'<span style="font-size:11px;color:var(--muted);">'+sub.join(' ・ ')+'</span>':'')+'</span>'
-        +'<span class="num" style="font-size:14px;font-weight:800;flex:none;">'+(o.count||0)+'本</span></div>';
-    });
-    h+='</div>';
-  }
-
-  // 休み（その日）
-  loadRestDays();
-  var drest=[];
-  Object.keys(restDays||{}).forEach(function(key){
-    (restDays[key]||[]).forEach(function(r){
-      if(r.date===date){
-        var pid=parseInt(key.split('__')[0]);
-        var p=partners.find(function(x){return x.id===pid;});
-        drest.push({name:p?p.name:'—', reason:r.reason||''});
-      }
-    });
+  // 茶商別にグループ化
+  var groups={};
+  dayTrades.forEach(function(t){
+    var b=partners.find(function(p){ return String(p.id)===String(t.buyerId); });
+    var nm=b?b.name:'（不明な売先）';
+    (groups[nm]=groups[nm]||[]).push(t);
   });
-  if(drest.length){
-    h+='<div class="section-label">休み</div><div class="card pad" style="margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.7;">'
-      +drest.map(function(r){return '🚫 '+r.name+(r.reason?'（'+escText(r.reason)+'）':'');}).join('<br>')+'</div>';
-  }
+  // 表示順：指定順→それ以外（取引のある茶商のみ）
+  var orderedNames=BUYER_ORDER.filter(function(n){ return groups[n]; });
+  Object.keys(groups).forEach(function(n){ if(orderedNames.indexOf(n)<0) orderedNames.push(n); });
 
-  // メモ（その日）
-  loadMemos();
-  var dms=allMemos.filter(function(m){return m.date===date;});
-  if(dms.length){
-    h+='<div class="section-label">メモ</div><div class="card" style="padding:4px 14px;margin-bottom:6px;">';
-    dms.forEach(function(m,i){
-      h+='<div style="padding:9px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'">'
-        +(m.tags&&m.tags.length?'<span style="font-size:10px;font-weight:700;color:var(--gold);">'+m.tags.join(' / ')+'</span><br>':'')
-        +'<span style="font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;">'+escText(m.body||'')+'</span></div>';
+  var body='';
+  if(!dayTrades.length){
+    body='<div style="text-align:center;color:var(--muted);padding:40px 16px;font-size:13px;">この日の取引はありません</div>';
+  } else {
+    orderedNames.forEach(function(nm){
+      var list=groups[nm];
+      body+='<div style="margin-bottom:9px;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;background:var(--matcha);color:#fff;border-radius:8px 8px 0 0;padding:4px 10px;font-size:13px;font-weight:800;">'+nm+'<span style="font-weight:600;opacity:.85;font-size:11px;">'+list.length+'件</span></div>'
+        +'<div style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;background:var(--surface);">';
+      list.forEach(function(t,i){
+        var prod=partners.find(function(p){ return String(p.id)===String(t.producerId); });
+        var pv=_prevProdTrade(t.producerId, date);
+        var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean).join('、');
+        var price=(t.price!=null?t.price:0);
+        var qty=(t.totalQty!=null?t.totalQty:0);
+        var line1='<span style="font-size:13px;font-weight:800;">'+(prod?prod.name:'—')+'</span>';
+        if(t.variety) line1+='<span style="font-size:11px;color:var(--muted);"> ・ '+t.variety+'</span>';
+        var bits=[];
+        if(marks) bits.push('<span style="color:var(--hint);">ロット</span> '+marks);
+        if(price>0) bits.push('<span style="color:var(--hint);">値</span> '+price.toLocaleString()+_dsDelta(price, pv?pv.price:null,0));
+        bits.push('<span style="color:var(--hint);">量</span> '+fmt(qty)+'kg'+_dsDelta(qty, pv?pv.totalQty:null,1));
+        var line2='<div style="font-size:11.5px;color:var(--ink2);margin-top:2px;line-height:1.5;">'+bits.join('<span style="color:var(--border2);"> ｜ </span>')+'</div>';
+        var comps=[];
+        components.forEach(function(c){
+          if(t.components && t.components[c]!=null && t.components[c]!==''){
+            var pvv=(pv&&pv.components&&pv.components[c]!=null)?pv.components[c]:null;
+            comps.push('<span style="color:var(--hint);">'+c+'</span> '+t.components[c]+_dsDelta(Number(t.components[c]), pvv!=null?Number(pvv):null,2));
+          }
+        });
+        var line3=comps.length?'<div style="font-size:11px;color:var(--ink2);margin-top:2px;line-height:1.5;">'+comps.join('<span style="color:var(--border2);"> ｜ </span>')+'</div>':'';
+        body+='<div style="padding:6px 10px;'+(i>0?'border-top:1px solid var(--border);':'')+'">'+line1+line2+line3+'</div>';
+      });
+      body+='</div></div>';
     });
-    h+='</div>';
   }
 
-  if(!ts.length && !dms.length && !dos.length && !drest.length && !moversCount){ h+='<div class="card pad" style="text-align:center;color:var(--muted);padding:28px 16px;">この日の記録はありません</div>'; }
-  h+='<button onclick="document.getElementById(\'day-digest\').remove();" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">閉じる</button>';
-  return h;
+  var tw=dayTrades.reduce(function(s,t){return s+(t.totalQty||0);},0);
+  var ta=dayTrades.reduce(function(s,t){return s+tradeAmount(t);},0);
+  var tk=calcTotalFee(dayTrades);
+
+  var ov=document.createElement('div'); ov.id='day-summary';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;justify-content:center;';
+  ov.innerHTML='<div style="width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;">'
+    +'<div style="flex:none;padding:calc(8px + env(safe-area-inset-top)) 14px 7px;border-bottom:1px solid var(--border);background:var(--surface);">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+        +'<button onclick="_renderDaySummary(\''+prev+'\')" style="width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-size:17px;cursor:pointer;">‹</button>'
+        +'<div class="serif" style="font-size:17px;font-weight:800;flex:1;text-align:center;">'+date.slice(5).replace("-","/")+'（'+wd+'）の取引</div>'
+        +'<button onclick="_renderDaySummary(\''+next+'\')" style="width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-size:17px;cursor:pointer;">›</button>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;">'
+        +'<input type="date" value="'+date+'" onchange="if(this.value)_renderDaySummary(this.value)" style="padding:5px 9px;font-size:12px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:inherit;">'
+        +'<button onclick="var s=document.getElementById(\'day-summary\');if(s)s.remove();" style="padding:6px 14px;font-size:12px;font-weight:700;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button>'
+      +'</div>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto;padding:9px 12px 6px;">'+body+'</div>'
+    +'<div style="flex:none;border-top:2px solid var(--matcha);background:var(--surface);padding:8px 14px calc(9px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;text-align:center;">'
+      +'<div><div style="font-size:10px;color:var(--muted);font-weight:700;">総重量</div><div class="num" style="font-size:16px;font-weight:900;">'+fmt(tw)+'<span style="font-size:10px;font-weight:700;">kg</span></div></div>'
+      +'<div><div style="font-size:10px;color:var(--muted);font-weight:700;">総金額</div><div class="num" style="font-size:16px;font-weight:900;">'+Math.round(ta).toLocaleString()+'<span style="font-size:10px;font-weight:700;">円</span></div></div>'
+      +'<div><div style="font-size:10px;color:var(--muted);font-weight:700;">総口銭</div><div class="num" style="font-size:16px;font-weight:900;color:var(--matcha);">'+Math.round(tk).toLocaleString()+'<span style="font-size:10px;font-weight:700;">円</span></div></div>'
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
 }
 
 function openFabMenu(){
@@ -7157,7 +7153,7 @@ function openFabMenu(){
   ov.innerHTML='<div style="position:fixed;right:18px;bottom:calc(186px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;align-items:flex-end;">'
     +'<button onclick="event.stopPropagation();closeFabMenu();showScreen(\'new-trade\')" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#34684a;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(52,104,74,.4);">✏️ 取引を記録</button>'
     +'<button onclick="event.stopPropagation();closeFabMenu();openMemoModal()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#f57c00;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(245,124,0,.4);">📝 メモ</button>'
-    +'<button onclick="event.stopPropagation();closeFabMenu();openDayDigest()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#1a1a18;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35);">📑 前日まとめ</button></div>';
+    +'<button onclick="event.stopPropagation();closeFabMenu();openDaySummary()" style="display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:24px;border:none;background:#1a1a18;color:#fff;font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35);">📑 前日サマリー</button></div>';
   document.body.appendChild(ov);
 }
 function closeFabMenu(){ var m=document.getElementById('fab-menu'); if(m) m.remove(); }
