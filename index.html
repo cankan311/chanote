@@ -7019,11 +7019,13 @@ function _digestDateNav(date){
   var prev=localDateStr(new Date(new Date(date+'T00:00:00').getTime()-86400000));
   var next=localDateStr(new Date(new Date(date+'T00:00:00').getTime()+86400000));
   var wd=['日','月','火','水','木','金','土'][new Date(date+'T00:00:00').getDay()];
-  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">'
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">'
     +'<button onclick="_renderDayDigest(\''+prev+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">‹</button>'
     +'<div style="text-align:center;"><div class="serif" style="font-size:19px;font-weight:700;">'+date.slice(5).replace("-","/")+'（'+wd+'）</div>'
     +'<button onclick="(function(){var dd=document.getElementById(\'day-digest\');if(dd)dd.remove();homeOpenDay(\''+date+'\');})()" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;margin-top:2px;">この日をカレンダーで開く ›</button></div>'
-    +'<button onclick="_renderDayDigest(\''+next+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">›</button></div>';
+    +'<button onclick="_renderDayDigest(\''+next+'\')" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:18px;cursor:pointer;">›</button></div>'
+    +'<label style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--muted);"><span>📅 日付を選んで移動</span>'
+    +'<input type="date" value="'+date+'" onchange="if(this.value)_renderDayDigest(this.value)" style="padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-family:inherit;"></label>';
 }
 function _dayDigestInner(date){
   var h='<div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--matcha);text-align:center;margin-bottom:4px;">📑 その日のまとめ</div>';
@@ -7048,15 +7050,49 @@ function _dayDigestInner(date){
   }
 
   // 稼働（誰が動いたか＝取引のあった生産家 ＋ 手動△）
+  var moversCount=0;
   try{
     loadActivityLog();
     var movers={};
     ts.forEach(function(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(p&&p.type==='producer') movers[docCanonName?docCanonName(p.name):p.name]=1; });
     var manual=activityLog[date]||{};
     Object.keys(manual).forEach(function(pid){ if(manual[pid]==='worked'){ var p=partners.find(function(x){return String(x.id)===String(pid);}); if(p) movers[(docCanonName?docCanonName(p.name):p.name)+'（稼働）']=1; } });
-    var mk=Object.keys(movers);
+    var mk=Object.keys(movers); moversCount=mk.length;
     if(mk.length){ h+='<div class="section-label">稼働した生産家</div><div class="card pad" style="margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.7;">'+mk.join('、')+'</div>'; }
   }catch(e){}
+
+  // 注文（その日）
+  loadOrders();
+  var dos=orders.filter(function(o){return o.date===date;});
+  if(dos.length){
+    h+='<div class="section-label">注文</div><div class="card" style="padding:4px 14px;margin-bottom:6px;">';
+    dos.forEach(function(o,i){
+      var prod=partners.find(function(p){return p.id===o.producerId;});
+      var sub=[]; if(o.variety) sub.push(o.variety); if(o.priceMemo) sub.push((o.priceMemo).toLocaleString()+'円目安'); if(o.memo) sub.push(escText(o.memo));
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'">'
+        +'<span style="flex:1;min-width:0;"><span style="font-size:14px;font-weight:700;display:block;">'+(o.buyer||'—')+' <span style="color:var(--hint);">←</span> '+(prod?prod.name:'—')+'</span>'
+        +(sub.length?'<span style="font-size:11px;color:var(--muted);">'+sub.join(' ・ ')+'</span>':'')+'</span>'
+        +'<span class="num" style="font-size:14px;font-weight:800;flex:none;">'+(o.count||0)+'本</span></div>';
+    });
+    h+='</div>';
+  }
+
+  // 休み（その日）
+  loadRestDays();
+  var drest=[];
+  Object.keys(restDays||{}).forEach(function(key){
+    (restDays[key]||[]).forEach(function(r){
+      if(r.date===date){
+        var pid=parseInt(key.split('__')[0]);
+        var p=partners.find(function(x){return x.id===pid;});
+        drest.push({name:p?p.name:'—', reason:r.reason||''});
+      }
+    });
+  });
+  if(drest.length){
+    h+='<div class="section-label">休み</div><div class="card pad" style="margin-bottom:6px;font-size:13px;color:var(--ink2);line-height:1.7;">'
+      +drest.map(function(r){return '🚫 '+r.name+(r.reason?'（'+escText(r.reason)+'）':'');}).join('<br>')+'</div>';
+  }
 
   // メモ（その日）
   loadMemos();
@@ -7071,7 +7107,7 @@ function _dayDigestInner(date){
     h+='</div>';
   }
 
-  if(!ts.length && !dms.length){ h+='<div class="card pad" style="text-align:center;color:var(--muted);padding:28px 16px;">この日の記録はありません</div>'; }
+  if(!ts.length && !dms.length && !dos.length && !drest.length && !moversCount){ h+='<div class="card pad" style="text-align:center;color:var(--muted);padding:28px 16px;">この日の記録はありません</div>'; }
   h+='<button onclick="document.getElementById(\'day-digest\').remove();" style="width:100%;margin-top:12px;padding:13px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">閉じる</button>';
   return h;
 }
