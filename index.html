@@ -6329,6 +6329,11 @@ function renderProducerChartsEc(){
 
   var legendOpt={type:'scroll',top:0,textStyle:{fontSize:10,fontFamily:EC_FONT},itemWidth:14,itemHeight:9,pageIconSize:10};
 
+  // 価格軸の範囲：表示中の最高値+500／最低値-500（違いを見やすく）
+  var _allP=[]; seriesDefs.forEach(function(sd){ sd.prices.forEach(function(v){ if(v!=null&&!isNaN(v)) _allP.push(v); }); });
+  var _pYMin=_allP.length?Math.max(0,Math.floor((Math.min.apply(null,_allP)-500)/100)*100):null;
+  var _pYMax=_allP.length?Math.ceil((Math.max.apply(null,_allP)+500)/100)*100:null;
+
   if(pc){
     pc.setOption({
       animationDuration:400,
@@ -6342,7 +6347,7 @@ function renderProducerChartsEc(){
       grid:{left:8,right:14,top:34,bottom:46,containLabel:true},
       dataZoom:ecZoomXY(),
       xAxis:ecAxisX(labels),
-      yAxis:Object.assign(ecAxisY(function(v){return v.toLocaleString();}),{scale:true}),
+      yAxis:Object.assign(ecAxisY(function(v){return v.toLocaleString();}),{scale:true, min:_pYMin, max:_pYMax}),
       series:seriesDefs.map(function(sd){
         return {name:sd.name,type:'line',data:sd.prices,connectNulls:true,smooth:0.3,
           symbolSize:7,lineStyle:{width:2.5,color:sd.color},
@@ -6406,83 +6411,18 @@ function renderHome(){
 
   var h='';
 
-  /* ---- 上部：日付＋天気＋テーマ ---- */
-  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 6px);margin-bottom:16px;">'
-    +'<div><div style="font-size:12px;font-weight:700;color:var(--matcha);letter-spacing:.06em;">'+(now.getMonth()+1)+'月'+now.getDate()+'日（'+youbi+'）'+(sn&&seasonDayNo?' ・ '+sn+seasonDayNo+'日目':'')+'</div>'
-    +'<div class="serif" style="font-size:27px;font-weight:700;line-height:1.15;margin-top:2px;">'+greet+'</div>'
-    +'<div id="home-weather" style="font-size:12px;color:var(--muted);margin-top:3px;">　</div></div>'
-    +'<button onclick="cycleTheme()" style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink2);box-shadow:var(--shadow-sm);flex:none;cursor:pointer;">'
+  /* ---- 上部：日付＋天気（ひと言）＋テーマ ---- */
+  h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 6px);margin-bottom:14px;">'
+    +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--matcha);letter-spacing:.06em;">'+(now.getMonth()+1)+'月'+now.getDate()+'日（'+youbi+'）'+(sn&&seasonDayNo?' ・ '+sn+seasonDayNo+'日目':'')+'</div>'
+    +'<div id="home-weather" class="serif" style="font-size:18px;font-weight:700;line-height:1.35;margin-top:4px;color:var(--ink);">天気を取得中…</div></div>'
+    +'<button onclick="cycleTheme()" style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink2);box-shadow:var(--shadow-sm);flex:none;cursor:pointer;margin-left:10px;">'
     +'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>';
 
-  /* ---- ヒーロー：今日のうごき ---- */
-  var heroMain = tToday.length ? (tToday.length+'件 ・ '+fq(tq)+' を商い') : '今日はまだ取引がありません';
-  h+='<div style="border-radius:26px;padding:20px;color:#fff;position:relative;overflow:hidden;background:linear-gradient(135deg,#3f6b4e,#2c533c 72%);box-shadow:0 14px 34px rgba(44,83,60,.34);">'
-    +'<div style="position:absolute;right:-30px;top:-30px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.15),transparent 70%);"></div>'
-    +'<div style="font-size:13px;opacity:.9;font-weight:500;">今日のうごき</div>'
-    +'<div class="serif" style="font-size:22px;font-weight:700;margin-top:1px;">'+heroMain+'</div>'
-    +'<div style="display:flex;gap:8px;margin-top:18px;position:relative;">'
-    +_hStat(tToday.length+'', '取引')
-    +_hStat(tq>0?fq(tq):'—','数量')
-    +_hStat(tq>0?Math.round(ta/tq).toLocaleString():'—','平均/kg')
-    +_hStat(ta>0?fy(ta):'—','金額')
-    +'</div></div>';
-
-  /* ---- クイックアクション ---- */
-  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:14px;">'
-    +_qa('<path d="M12 5v14M5 12h14"/>','記録',"showScreen('new-trade')")
-    +_qa('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>','メモ','openMemoModal()')
-    +_qa('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>','稼働表',"showScreen('calendar');showCalTab('gantt')")
-    +_qa('<path d="M6 20V14M12 20V4M18 20v-6"/>','分析',"showScreen('analyze')")
-    +'</div>';
-  h+='<button onclick="openDaySummary()" style="width:100%;margin-top:12px;padding:13px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;gap:8px;">📑 前日のまとめを見る</button>';
-
-  /* ---- ホーム：当月カレンダー ---- */
-  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
-  h+='<div class="card" id="home-cal-card" style="padding:14px 14px 12px;"></div>';
-
-
-  /* ---- 気づき（対処が必要なこと） ---- */
-  var notes=[];
-  // 未提出書類
-  try{
-    var seasonKey=sn||'_all';
-    var subs=(docSubmissions&&docSubmissions[seasonKey])||{};
-    var prodGroups=_homeDocGroups();
-    var notSub=prodGroups.filter(function(g){ var r=subs[g.id]; return !(r&&((r.trace&&r.trace.submitted)||(r.match&&r.match.submitted))); });
-    if(notSub.length){ notes.push({ico:'📄',col:'gold',txt:notSub.slice(0,1)[0].name+(notSub.length>1?'ほか'+(notSub.length-1)+'件':'')+'、書類が未提出です',act:"showScreen('docs')"}); }
-  }catch(e){}
-  // 今日まだ動いていない生産家（昨日まで活発で今日取引なし）
-  try{
-    var activeY={}; var y=localDateStr(new Date(now.getTime()-86400000));
-    trades.forEach(function(t){ if(t.season===sn){ if(t.date===y) activeY[t.producerId]=1; } });
-    var movedToday={}; tToday.forEach(function(t){ movedToday[t.producerId]=1; });
-    var stalled=Object.keys(activeY).filter(function(pid){return !movedToday[pid];})
-      .map(function(pid){var pp=partners.find(function(x){return x.id===parseInt(pid);});return pp?pp.name:null;}).filter(Boolean);
-    if(stalled.length){ notes.push({ico:'🍃',col:'tea',txt:stalled.slice(0,2).join('・')+(stalled.length>2?'ほか':'')+' は今日まだ動きなし',act:"showScreen('calendar');showCalTab('gantt')"}); }
-  }catch(e){}
-  // バックアップ
-  var lastBk=''; try{ lastBk=_safeLS.getItem('ocha_last_backup')||''; }catch(e){}
-  var bkDays=lastBk?Math.floor((now-new Date(lastBk+'T00:00:00'))/86400000):999;
-  if(bkDays>=7){ notes.push({ico:'💾',col:'gold',txt:(lastBk?'バックアップから'+bkDays+'日':'バックアップ未取得')+'。保存をおすすめします',act:'backupData()'}); }
-
-  if(notes.length){
-    h+='<div class="section-label">気づき</div>';
-    notes.forEach(function(n){
-      var bg=n.col==='tea'?'var(--matcha-light)':'var(--gold-light)';
-      var bd=n.col==='tea'?'var(--matcha-mid)':'var(--gold-mid)';
-      var cl=n.col==='tea'?'var(--matcha)':'var(--gold)';
-      h+='<div onclick="'+n.act+'" style="display:flex;align-items:center;gap:11px;border-radius:16px;padding:13px 15px;background:'+bg+';border:1px solid '+bd+';margin-bottom:9px;cursor:pointer;">'
-        +'<span style="font-size:19px;">'+n.ico+'</span>'
-        +'<span style="flex:1;font-size:13px;font-weight:600;color:'+cl+';line-height:1.4;">'+n.txt+'</span>'
-        +'<span style="font-size:12px;font-weight:800;color:'+cl+';white-space:nowrap;">›</span></div>';
-    });
-  }
-
-  /* ---- 茶期の進捗 ---- */
+  /* ---- 二番茶（今茶期）の進捗 ---- */
   if(sd){
     var st=new Date(sd.startDate+'T00:00:00'), en=new Date(sd.endDate+'T00:00:00');
     var pct=Math.min(100,Math.max(0,Math.round((now-st)/(en-st)*100)));
-    var sTr=trades.filter(function(t){return t.season===sn && t.date>=sd.startDate && t.date<=sd.endDate;});
+    var sTr=trades.filter(function(t){return t.date>=sd.startDate && t.date<=sd.endDate;});
     var sq=sTr.reduce(function(s2,t){return s2+(t.totalQty||0);},0);
     var sa=sTr.reduce(function(s2,t){return s2+tradeAmount(t);},0);
     var remain=Math.max(0,Math.ceil((en-now)/86400000));
@@ -6492,6 +6432,18 @@ function renderHome(){
       +'<div style="height:9px;background:var(--paper2);border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--matcha),#6aa97f);border-radius:5px;"></div></div>'
       +'<div style="display:flex;justify-content:space-between;margin-top:12px;font-size:13px;"><span style="color:var(--muted);">累計 <b class="num" style="color:var(--matcha);">'+fq(sq)+'</b>（'+sTr.length+'件）</span><span style="color:var(--muted);">金額 <b class="num" style="color:var(--matcha);">'+fy(sa)+'円</b></span></div></div>';
   }
+
+  /* ---- カレンダー ---- */
+  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
+  h+='<div class="card" id="home-cal-card" style="padding:14px 14px 12px;"></div>';
+
+  /* ---- ダッシュボード（生産家の進捗） ---- */
+  try{ h+=renderDashboard(sn, sd?sd.startDate:null, today); }catch(e){}
+
+  /* ---- 今日のメモ ---- */
+  loadMemos();
+  var dm=renderDayMemos(today);
+  if(dm){ h+='<div class="section-label">今日のメモ</div>'+dm; }
 
   /* ---- 直近の取引 ---- */
   var recent=trades.slice().sort(function(a,b){return b.date.localeCompare(a.date)||b.id-a.id;}).slice(0,4);
@@ -6513,11 +6465,6 @@ function renderHome(){
     h+='</div>';
   }
 
-  /* ---- 今日のメモ ---- */
-  loadMemos();
-  var dm=renderDayMemos(today);
-  if(dm){ h+='<div class="section-label">今日のメモ</div>'+dm; }
-
   el.innerHTML=h;
   try{ renderHomeCal(); }catch(e){}
 
@@ -6527,12 +6474,113 @@ function renderHome(){
   var rows=el.querySelector('.rows');
   if(rows && rows.lastElementChild){ rows.lastElementChild.style.borderBottom='none'; }
 
-  // 天気（非同期）
+  // 天気（非同期・ひと言）
   fetchMonthWeather(now.getFullYear(), now.getMonth()).then(function(){
-    var w=weatherCache[today];
     var we=document.getElementById('home-weather');
-    if(w&&we) we.innerHTML=(w.icon||'')+'　'+(w.tMax!=null&&w.tMax!=='—'?'<span style="color:#e06c6c;font-weight:700;">'+Math.round(w.tMax)+'°</span> / <span style="color:#2980b9;">'+Math.round(w.tMin)+'°</span>':'')+(w.jmaPop!=null?'　☔'+w.jmaPop+'%':'');
-  }).catch(function(){});
+    if(we) we.textContent=_homeWeatherLine(weatherCache[today]);
+  }).catch(function(){ var we=document.getElementById('home-weather'); if(we) we.textContent='天気を取得できませんでした'; });
+}
+
+/* ===== 天気のひと言 ===== */
+function _homeWeatherLine(w){
+  if(!w) return '本日の天気は取得中です';
+  var t=(w.tMax!=null&&w.tMax!=='—')?Math.round(w.tMax):null;
+  var tmin=(w.tMin!=null&&w.tMin!=='—')?Math.round(w.tMin):null;
+  var pop=(w.jmaPop!=null)?w.jmaPop:null;
+  var head;
+  if(pop!=null && pop>=70) head='本日は雨になりそうです';
+  else if(pop!=null && pop>=40) head='所により雨が降りそうです';
+  else if(t!=null && t>=33) head='厳しい暑さになりそうです';
+  else if(t!=null && t>=30) head='暑くなりそうです';
+  else if(t!=null && t<=8) head='冷え込みそうです';
+  else head='本日は穏やかな天気の見込みです';
+  var tail=[];
+  if(t!=null) tail.push('最高'+t+'°'+(tmin!=null?'/最低'+tmin+'°':''));
+  if(pop!=null) tail.push('降水'+pop+'%');
+  return (w.icon?w.icon+' ':'')+head+(tail.length?'（'+tail.join(' ・ ')+'）':'');
+}
+
+/* ===== ダッシュボード（生産家の進捗） ===== */
+var DASH_PRODUCERS=[
+  {id:1779026670470, icon:'湯', name:'湯日'},
+  {id:1779026670481, icon:'吹', name:'吹木'},
+  {id:1779026670480, icon:'日', name:'下湯日'},
+  {id:1779026670469, icon:'鎌', name:'鎌塚'}
+];
+function loadProdTargets(){ try{ return JSON.parse(_safeLS.getItem('ocha_prod_targets')||'{}'); }catch(e){ return {}; } }
+function saveProdTargets(o){ try{ _safeLS.setItem('ocha_prod_targets', JSON.stringify(o)); }catch(e){} }
+// 指定生産家の今茶期の進捗（販売日数・目標・残・%）
+function _prodProgress(pid, seasonName, seasonStart, today){
+  var dates={};
+  if(seasonStart){
+    trades.forEach(function(t){
+      if(String(t.producerId)===String(pid) && t.date>=seasonStart && t.date<=today) dates[t.date]=1;
+    });
+  }
+  var done=Object.keys(dates).length;
+  var targets=loadProdTargets();
+  var tgt=(seasonName && targets[seasonName] && targets[seasonName][pid]!=null)?targets[seasonName][pid]:null;
+  var remaining=(tgt!=null)?Math.max(0,tgt-done):null;
+  var pct=(tgt&&tgt>0)?Math.min(100,Math.round(done/tgt*100)):null;
+  return {done:done, target:tgt, remaining:remaining, pct:pct};
+}
+function renderDashboard(seasonName, seasonStart, today){
+  var h='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">ダッシュボード <button onclick="openProgressSettings()" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">進捗を設定 ›</button></div>';
+  h+='<div class="card" style="padding:12px 10px;"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px;">';
+  DASH_PRODUCERS.forEach(function(p){
+    var pr=_prodProgress(p.id, seasonName, seasonStart, today);
+    var pctTxt=(pr.pct!=null)?pr.pct+'%':'未設定';
+    var ring=(pr.pct!=null)?pr.pct:0;
+    var col=(pr.pct==null)?'var(--hint)':(pr.pct>=100?'#2e7d32':'var(--matcha)');
+    h+='<div onclick="openProgressSettings()" style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--paper);cursor:pointer;">'
+      +'<div style="width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;background:conic-gradient('+col+' '+(ring*3.6)+'deg, var(--border2) 0deg);position:relative;">'
+        +'<span style="width:36px;height:36px;border-radius:50%;background:var(--matcha);display:flex;align-items:center;justify-content:center;">'+p.icon+'</span></div>'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-size:15px;font-weight:900;color:'+col+';line-height:1;">'+pctTxt+'</div>'
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.4;">販売'+pr.done+'日目'+(pr.remaining!=null?'<br>残り約'+pr.remaining+'日':'<br>目標未設定')+'</div>'
+      +'</div></div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+function openProgressSettings(){
+  var sn=seasonForDate(localDateStr(new Date()));
+  var targets=loadProdTargets();
+  var cur=(sn && targets[sn])?targets[sn]:{};
+  var old=document.getElementById('progress-settings'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='progress-settings';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;justify-content:center;overflow-y:auto;';
+  var rows='';
+  DASH_PRODUCERS.forEach(function(p){
+    var v=(cur[p.id]!=null)?cur[p.id]:'';
+    rows+='<div style="display:flex;align-items:center;gap:12px;padding:14px 4px;border-bottom:1px solid var(--border);">'
+      +'<div style="width:42px;height:42px;border-radius:50%;flex:none;background:var(--matcha);color:#fff;font-weight:900;font-size:18px;display:flex;align-items:center;justify-content:center;">'+p.icon+'</div>'
+      +'<div style="flex:1;"><div style="font-size:15px;font-weight:700;">'+p.name+'</div><div style="font-size:11px;color:var(--muted);">今茶期に販売しそうな日数</div></div>'
+      +'<input type="number" inputmode="numeric" id="pt-'+p.id+'" value="'+v+'" placeholder="—" style="width:74px;padding:9px;font-size:16px;text-align:center;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);font-family:inherit;">'
+      +'<span style="font-size:13px;color:var(--muted);">日</span></div>';
+  });
+  ov.innerHTML='<div style="width:100%;max-width:460px;padding:calc(14px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom));">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div class="serif" style="font-size:20px;font-weight:800;">進捗の設定'+(sn?'（'+sn+'）':'')+'</div>'
+      +'<button onclick="var s=document.getElementById(\'progress-settings\');if(s)s.remove();" style="padding:7px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕</button></div>'
+    +'<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px;">各生産家が今茶期に「何日くらい販売しそうか」を入力すると、これまでの販売日数から進捗率・残り日数を計算します。</div>'
+    +rows
+    +'<button onclick="saveProgressSettings()" style="width:100%;margin-top:18px;padding:14px;border-radius:14px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:15px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(52,104,74,.28);">保存する</button>'
+  +'</div>';
+  document.body.appendChild(ov);
+}
+function saveProgressSettings(){
+  var sn=seasonForDate(localDateStr(new Date())); if(!sn) sn='_all';
+  var targets=loadProdTargets(); if(!targets[sn]) targets[sn]={};
+  DASH_PRODUCERS.forEach(function(p){
+    var el=document.getElementById('pt-'+p.id); if(!el) return;
+    var v=el.value.trim();
+    if(v==='' || isNaN(parseInt(v))){ delete targets[sn][p.id]; }
+    else { targets[sn][p.id]=Math.max(0,parseInt(v)); }
+  });
+  saveProdTargets(targets);
+  var s=document.getElementById('progress-settings'); if(s) s.remove();
+  try{ renderHome(); }catch(e){}
+  toast('進捗を保存しました');
 }
 
 
