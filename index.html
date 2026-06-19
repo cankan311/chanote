@@ -637,6 +637,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
     <button class="more-item" onclick="moreGo('insight')" id="more-insight"><span class="mi-ico">🧠</span>状況分析</button>
     <button class="more-item" onclick="moreGo('partners')" id="more-partners"><span class="mi-ico">👥</span>取引先</button>
     <button class="more-item" onclick="moreGo('market')" id="more-market"><span class="mi-ico">📣</span>市場・情報</button>
+    <button class="more-item" onclick="closeMoreSheet();openKomiPage()" id="more-komi"><span class="mi-ico">💰</span>斡旋口銭</button>
     <button class="more-item" onclick="moreGo('order')" id="more-order"><span class="mi-ico">📋</span>注文</button>
     <button class="more-item" onclick="moreGo('docs')" id="more-docs"><span class="mi-ico">📄</span>書類</button>
     <button class="more-item" onclick="moreGo('new-trade')" id="more-new-trade"><span class="mi-ico">✏️</span>記録</button>
@@ -4550,17 +4551,21 @@ function renderAnalyze(){
       }
     } else if(id==='pgraph'){
       if(producers.length&&ftrades.length){
-        h+='<div class="section-label">生産家別 価格・数量グラフ</div>';
-        h+='<div class="card" style="margin-bottom:14px;">'+producerSelectHtml;
+        h+='<div class="section-label">'+(analyzeChartMode==='buyer'?'茶商別':'生産家別')+' 価格・数量グラフ</div>';
+        h+='<div class="seg" style="display:flex;gap:3px;background:var(--paper2);padding:3px;border-radius:11px;margin-bottom:10px;">'
+          +'<button onclick="setAnalyzeChartMode(\'producer\')" style="flex:1;padding:8px 2px;font-size:12px;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;'+(analyzeChartMode!=='buyer'?'background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);':'background:transparent;color:var(--muted);')+'">生産家別</button>'
+          +'<button onclick="setAnalyzeChartMode(\'buyer\')" style="flex:1;padding:8px 2px;font-size:12px;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;'+(analyzeChartMode==='buyer'?'background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);':'background:transparent;color:var(--muted);')+'">茶商別</button>'
+        +'</div>';
+        h+='<div class="card" style="margin-bottom:14px;">'+(analyzeChartMode==='buyer'?'':producerSelectHtml);
         h+='<div style="margin-top:14px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">価格推移（円/kg）― 売り先・品種別</span>';
+        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">価格推移（円/kg）― '+(analyzeChartMode==='buyer'?'生産家・品種別':'売り先・品種別')+'</span>';
         h+='<button onclick="resetPriceZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
         h+='<div style="position:relative;height:300px;"><div id="producer-price-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
         h+='<div style="margin-top:16px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">数量推移（kg）― 売り先・品種別</span>';
+        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">数量推移（kg）― '+(analyzeChartMode==='buyer'?'生産家・品種別':'売り先・品種別')+'</span>';
         h+='<button onclick="resetQtyZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
         h+='<div style="position:relative;height:280px;"><div id="producer-qty-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
@@ -4582,14 +4587,6 @@ function renderAnalyze(){
         h+='</div>';
         h+='<div style="position:relative;height:300px;"><div id="comp-chart" data-ec style="width:100%;height:100%;"></div></div>';
         h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">凡例（生産家名）をタップで表示/非表示。ピンチでズーム。成分の入った取引のみ表示。</div>';
-        h+='</div>';
-      }
-    } else if(id==='komigraph'){
-      if(ftrades.length){
-        h+='<div class="section-label">日毎の斡旋口銭の推移</div>';
-        h+='<div class="card" style="margin-bottom:14px;padding:14px;">';
-        h+='<div style="position:relative;height:280px;"><div id="komi-chart" data-ec style="width:100%;height:100%;"></div></div>';
-        h+='<div style="font-size:10px;color:var(--hint);text-align:center;margin-top:8px;">各取引の口銭率（湯日/下湯日/吹木→ハラダは1.6%、他1.8%）で日別合計。ピンチでズーム。</div>';
         h+='</div>';
       }
     } else if(id==='buyer'){
@@ -4665,7 +4662,7 @@ function renderAnalyze(){
   // タブ別のセクション割り当て
   var TAB_SECTIONS = {
     summary:  ['summary','komisyon','pavgqty','buyer'],
-    graph:    ['ovgraph','compgraph','komigraph','pgraph'],
+    graph:    ['ovgraph','compgraph','pgraph'],
     forecast: ['forecast','pfore','opstats'],
   };
   var visibleIds = TAB_SECTIONS[analyzeTab] || TAB_SECTIONS.summary;
@@ -4697,7 +4694,7 @@ function renderAnalyze(){
   el.innerHTML=html;
   if(analyzeTab==='graph' && ftrades.length) setTimeout(function(){renderOverviewCharts();},50);
   if(analyzeTab==='graph' && producers.length&&ftrades.length) setTimeout(function(){renderProducerCharts();},50);
-  if(analyzeTab==='graph') setTimeout(function(){ try{renderCompChart();}catch(e){} try{renderKomiChart();}catch(e){} },60);
+  if(analyzeTab==='graph') setTimeout(function(){ try{renderCompChart();}catch(e){} },60);
 }
 
 /* ---- 生産家別残量予測 ---- */
@@ -4773,7 +4770,6 @@ var ANALYZE_SECTIONS=[
   {id:'opstats',  label:'生産家別 稼働状況'},
   {id:'pavgqty',  label:'生産家別 平均単価・合計数量'},
   {id:'compgraph', label:'生産家別 成分・単価の推移'},
-  {id:'komigraph', label:'日毎の斡旋口銭の推移'},
   {id:'pgraph',   label:'生産家別 価格・数量グラフ'},
   {id:'buyer',    label:'販売先別 合計数量'},
 ];
@@ -4782,6 +4778,9 @@ var analyzeOrder=null;
 function loadAnalyzeOrder(){
   try{var o=_safeLS.getItem('ocha_analyze_order');if(o)analyzeOrder=JSON.parse(o);}catch(e){}
   if(!analyzeOrder) analyzeOrder=ANALYZE_SECTIONS.map(function(s){return s.id;});
+  // 廃止セクション（komigraph＝口銭推移は専用ページへ移設）を保存順からも除外
+  var _validIds=ANALYZE_SECTIONS.map(function(s){return s.id;});
+  analyzeOrder=analyzeOrder.filter(function(id){return _validIds.indexOf(id)>=0;});
 }
 function saveAnalyzeOrder(){
   _safeLS.setItem('ocha_analyze_order',JSON.stringify(analyzeOrder));
@@ -5124,8 +5123,15 @@ function getChartColor(i){return CHART_COLORS[i%CHART_COLORS.length];}
 var _priceChartInstance = null;
 var _qtyChartInstance   = null;
 
+var analyzeChartMode='producer';
+function setAnalyzeChartMode(m){ analyzeChartMode=m; renderAnalyze(); }
 function renderProducerCharts(){
-  renderProducerChartsEc();
+  if(analyzeChartMode==='buyer'){
+    var ft=getFilteredTrades().filter(function(t){ var b=partners.find(function(p){return p.id===t.buyerId;}); return b && b.type==='chasho'; });
+    renderAllProducersCharts(ft, true);
+  } else {
+    renderProducerChartsEc();
+  }
 }
 
 function resetPriceZoom(){ ecResetZoom('producer-price-chart'); }
@@ -6039,6 +6045,74 @@ function renderKomiChart(){
   });
 }
 
+/* ===== 斡旋口銭 専用ページ ===== */
+function _fyKomi(n){ n=Math.round(n||0); return n>=10000?(Math.round(n/1000)/10)+'万':n.toLocaleString(); }
+function _renderKomiPageChart(list){
+  if(typeof echarts==='undefined') return;
+  var c=ecInit('komipage-chart'); if(!c) return;
+  var byDate={}; list.forEach(function(t){ if(!t.date)return; byDate[t.date]=(byDate[t.date]||0)+calcFee(t); });
+  var dates=Object.keys(byDate).sort();
+  if(!dates.length){ c.setOption({title:{text:'この茶期の口銭データがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); return; }
+  var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
+  var vals=dates.map(function(d){return Math.round(byDate[d]);});
+  c.setOption({
+    color:['#c89b3c'], textStyle:{fontFamily:EC_FONT},
+    tooltip:{trigger:'axis', valueFormatter:function(v){return (typeof ecMoney==='function')?ecMoney(v):Math.round(v).toLocaleString()+'円';}},
+    grid:{left:52,right:12,top:16,bottom:44},
+    xAxis:{type:'category', data:labels, axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86'}},
+    yAxis:{type:'value', axisLabel:{fontFamily:EC_FONT,fontSize:10,color:'#8a8a86',formatter:function(v){return v>=10000?(v/10000)+'万':v;}}, splitLine:{lineStyle:{color:'#f0ede6'}}},
+    dataZoom:[{type:'inside'},{type:'slider',height:14,bottom:12}],
+    series:[{name:'斡旋口銭', type:'bar', data:vals, itemStyle:{color:'#c89b3c',borderRadius:[4,4,0,0]}}]
+  });
+}
+function openKomiPage(){
+  var year=String(new Date().getFullYear());
+  var sn=seasonForDate(localDateStr(new Date()));
+  var sd=sn?getSeasonDefs().filter(function(x){return x.name===sn;}).sort(function(a,b){return String(b.startDate).localeCompare(String(a.startDate));})[0]:null;
+  var all=trades;
+  var cnt=all.length;
+  var feeAll=calcTotalFee(all);
+  var feeYear=calcTotalFee(all.filter(function(t){return (t.date||'').slice(0,4)===year;}));
+  var seasonTrades=sd?all.filter(function(t){return t.date>=sd.startDate && t.date<=sd.endDate;}):[];
+  var feeSeason=calcTotalFee(seasonTrades);
+  var avg=cnt?Math.round(feeAll/cnt):0;
+  // 生産家別ランキング
+  var byProd={};
+  all.forEach(function(t){ byProd[t.producerId]=(byProd[t.producerId]||0)+calcFee(t); });
+  var rank=Object.keys(byProd).map(function(pid){ var p=partners.find(function(x){return String(x.id)===String(pid);}); return {name:p?p.name:'—', fee:byProd[pid]}; })
+    .filter(function(r){return r.fee>0;}).sort(function(a,b){return b.fee-a.fee;});
+  var rankMax=rank.length?rank[0].fee:1;
+
+  function stat(label,val,sub,col){
+    return '<div style="flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 10px;text-align:center;">'
+      +'<div style="font-size:10px;color:var(--muted);font-weight:700;">'+label+'</div>'
+      +'<div class="num" style="font-size:19px;font-weight:900;color:'+(col||'var(--gold)')+';line-height:1.2;margin-top:3px;">'+val+'<span style="font-size:11px;">円</span></div>'
+      +(sub?'<div style="font-size:10px;color:var(--hint);margin-top:2px;">'+sub+'</div>':'')+'</div>';
+  }
+  var rankHtml=rank.length?rank.map(function(r,i){
+    var w=Math.round(r.fee/rankMax*100);
+    return '<div style="padding:8px 0;'+(i>0?'border-top:1px solid var(--border);':'')+'">'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span style="font-weight:700;">'+(i+1)+'. '+r.name+'</span><span class="num" style="font-weight:800;color:var(--gold);">'+Math.round(r.fee).toLocaleString()+'円</span></div>'
+      +'<div style="height:6px;background:var(--paper2);border-radius:4px;overflow:hidden;"><div style="height:100%;width:'+w+'%;background:linear-gradient(90deg,#c89b3c,#e0c068);border-radius:4px;"></div></div></div>';
+  }).join(''):'<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center;">口銭データがありません</div>';
+
+  var old=document.getElementById('komi-page'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='komi-page';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;justify-content:center;overflow-y:auto;';
+  ov.innerHTML='<div style="width:100%;max-width:460px;padding:calc(14px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div class="serif" style="font-size:21px;font-weight:800;">💰 斡旋口銭</div>'
+      +'<button onclick="var s=document.getElementById(\'komi-page\');if(s)s.remove();" style="padding:7px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button></div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:8px;">'+stat(year+'年の合計', _fyKomi(feeYear), '今年の累計','var(--gold)')+stat((sn||'今茶期')+'の合計', _fyKomi(feeSeason), seasonTrades.length+'件','var(--matcha)')+'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:16px;">'+stat('1取引あたり平均', avg.toLocaleString(), '全'+cnt+'件の平均','var(--ink2)')+stat('全期間の合計', _fyKomi(feeAll), 'これまでの総額','var(--gold)')+'</div>'
+    +'<div class="section-label">'+(sn||'今茶期')+'の推移（日別）</div>'
+    +'<div class="card" style="padding:10px;"><div style="position:relative;height:230px;"><div id="komipage-chart" data-ec style="width:100%;height:100%;"></div></div></div>'
+    +'<div class="section-label">生産家別 斡旋口銭ランキング</div>'
+    +'<div class="card pad">'+rankHtml+'</div>'
+  +'</div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){ try{ _renderKomiPageChart(seasonTrades.length?seasonTrades:all); }catch(e){} },60);
+}
+
 /* ===== ECharts 共通基盤 ===== */
 function ecInit(id){
   var el=document.getElementById(id);
@@ -6234,13 +6308,13 @@ function renderOverviewCharts(){
 
 /* ===== 生産家別グラフ（ECharts） ===== */
 
-function renderAllProducersCharts(ft){
+function renderAllProducersCharts(ft, byBuyer){
   var pc=ecInit('producer-price-chart'); var qc=ecInit('producer-qty-chart');
   if(!ft.length){
     [pc,qc].forEach(function(c){ if(c) c.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); });
     return;
   }
-  function gname(t){ var p=partners.find(function(x){return x.id===t.producerId;}); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  function gname(t){ var id=byBuyer?t.buyerId:t.producerId; var p=partners.find(function(x){return x.id===id;}); if(!p) return '—'; return (typeof docCanonName==='function'&&!byBuyer)?docCanonName(p.name):p.name; }
   var dset={},dates=[]; ft.forEach(function(t){ if(t.date&&!dset[t.date]){dset[t.date]=1;dates.push(t.date);} }); dates.sort();
   var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
   var groups={};
@@ -6417,6 +6491,11 @@ function renderHome(){
     +'<div id="home-weather" class="serif" style="font-size:18px;font-weight:700;line-height:1.35;margin-top:4px;color:var(--ink);">天気を取得中…</div></div>'
     +'<button onclick="cycleTheme()" style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--ink2);box-shadow:var(--shadow-sm);flex:none;cursor:pointer;margin-left:10px;">'
     +'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button></div>';
+  /* ---- よく使う天気予報（島田）への導線 ---- */
+  h+='<div style="display:flex;gap:8px;margin-bottom:16px;">'
+    +'<a href="https://weather.yahoo.co.jp/weather/jp/22/5010/22209.html" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--ink2);font-size:12px;font-weight:700;text-decoration:none;box-shadow:var(--shadow-sm);">☀️ Yahoo天気<br><span style="font-size:10px;color:var(--muted);font-weight:600;">島田</span></a>'
+    +'<a href="https://weathernews.jp/onebox/tenki/shizuoka/22209/" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--ink2);font-size:12px;font-weight:700;text-decoration:none;box-shadow:var(--shadow-sm);">🌧 ウェザーニュース<br><span style="font-size:10px;color:var(--muted);font-weight:600;">島田</span></a>'
+  +'</div>';
 
   /* ---- 二番茶（今茶期）の進捗 ---- */
   if(sd){
