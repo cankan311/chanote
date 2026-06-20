@@ -623,7 +623,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 <div class="tab-bar">
   <button class="tab active" onclick="showScreen('home')" id="tab-home"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg></span>ホーム</button>
   <button class="tab" onclick="showScreen('market')" id="tab-market"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg></span>市場</button>
-  <button class="tab" onclick="showScreen('calendar')" id="tab-calendar"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>稼働表</button>
+  <button class="tab" onclick="showScreen('calendar')" id="tab-calendar"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>ノート</button>
   <button class="tab" onclick="showScreen('analyze')" id="tab-analyze"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>分析</button>
   <button class="tab" onclick="openMoreSheet()" id="tab-more"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>もっと</button>
 </div>
@@ -775,41 +775,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
 
 <!-- カレンダー -->
 <div id="screen-calendar" class="screen">
-  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">カレンダー</div>
+  <div class="page-title" style="padding-top:calc(env(safe-area-inset-top) + 6px);">ノート</div>
   <!-- サブタブ -->
   <div class="seg" style="display:flex;gap:3px;margin-bottom:14px;background:var(--paper2);padding:3px;border-radius:13px;">
-    <button id="cal-tab-cal"    onclick="showCalTab('cal')"    style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">カレンダー</button>
+    <button id="cal-tab-memo"   onclick="showCalTab('memo')"   style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">メモ帳</button>
+    <button id="cal-tab-teai"   onclick="openTeaiAlbum()"      style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">手合帳 ↗</button>
     <button id="cal-tab-gantt"  onclick="showCalTab('gantt')"  style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">稼働表</button>
   </div>
-  <!-- カレンダービュー -->
-  <div id="cal-view-cal">
-    <div class="cal-wrap">
-      <div class="cal-nav">
-        <button class="cal-nav-btn" onclick="calPrev()">‹</button>
-        <span class="cal-month" id="cal-title"></span>
-        <button class="cal-nav-btn" onclick="calNext()">›</button>
-      </div>
-      <div class="cal-grid" id="cal-grid"></div>
-      <div class="cal-legend">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--matcha);"></span> 取引</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);"></span> 手合帳</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2196f3;"></span> 稼働</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff9800;"></span> メモ</span>
-      </div>
-    </div>
-    <div id="cal-teai-section" style="display:none;">
-      <div class="section-label">手合わせ帳</div>
-      <div id="cal-teai-images"></div>
-      <label class="teai-upload-label">
-        📸 この日の手合わせ帳を追加する
-        <input type="file" accept="image/*" multiple style="display:none;" onchange="addTeaiImage(this)">
-      </label>
-    </div>
-    <div id="cal-tx-list"></div>
-    <div id="cal-weather-section" style="display:none;margin-top:4px;">
-      <div id="cal-weather-content"></div>
-    </div>
-  </div>
+  <!-- メモ帳ビュー -->
+  <div id="cal-view-memo"></div>
   <!-- 稼働ガントビュー -->
   <div id="cal-view-gantt" style="display:none;">
     <div id="gantt-content"></div>
@@ -1627,7 +1601,7 @@ function showScreen(name, isBack){
   try{ window.scrollTo(0,0); }catch(e){}
   if(name==='home') renderHome();
   if(name==='analyze') renderAnalyze();
-  if(name==='calendar'){ showCalTab(calTab); renderCalendar(); renderCalTeai(); }
+  if(name==='calendar'){ if(calTab==='cal') calTab='memo'; showCalTab(calTab); }
   if(name==='new-trade'){ window._prefilledPair=null; _hidePrefillBanner(); }
   if(name==='sample') renderSample();
   if(name==='insight') renderInsight();
@@ -2163,6 +2137,7 @@ function saveMemo(){
   }
   var wasEdit=_editingMemoId!==null;
   loadMemos();
+  try{ renderNoteMemo(); }catch(e){}
   _editingMemoId=null;
   _memoAttachments=[];
   renderMemoAttachPreview();
@@ -2192,6 +2167,72 @@ function _hl(text, q){
     var re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
     return escText(text).replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#ffe08a;color:inherit;padding:0 1px;border-radius:2px;">$1</mark>');
   }catch(e){ return escText(text); }
+}
+var AMAZON_ALBUM_URL='https://www.amazon.co.jp/photos/share/cDDtqo0Wxa4I0GxXGjE1aMLVC7MBn9CeJjSZtEG9XHn';
+function openTeaiAlbum(){ window.open(AMAZON_ALBUM_URL,'_blank','noopener'); }
+
+var _noteMemoTag='';
+function noteMemoOpenTag(t){ _noteMemoTag=t; renderNoteMemo(); }
+function toggleMemoPin(id){
+  id=Number(id);
+  Object.keys(quickMemos).forEach(function(k){ (quickMemos[k]||[]).forEach(function(m){ if(m.id===id) m.pinned=!m.pinned; }); });
+  saveMemos(); loadMemos(); renderNoteMemo();
+}
+function _noteMemoCard(m, q){
+  var tagHtml=(m.tags||[]).map(function(t){return '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fff3e0;color:#e65100;font-weight:600;">'+t+'</span>';}).join(' ');
+  return '<div class="card" style="margin-bottom:10px;padding:12px 14px;'+(m.pinned?'border-left:3px solid var(--gold);':'')+'">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;">'
+    +'<div style="font-size:11px;color:var(--muted);">'+(m.date||'日付なし')+(tagHtml?' &nbsp;'+tagHtml:'')+'</div>'
+    +'<div style="display:flex;gap:5px;flex-shrink:0;">'
+    +'<button onclick="toggleMemoPin(\''+m.id+'\')" style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid '+(m.pinned?'var(--gold)':'var(--border2)')+';background:'+(m.pinned?'#fdf3df':'transparent')+';color:'+(m.pinned?'var(--gold)':'var(--muted)')+';cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">📌</button>'
+    +'<button onclick="editMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 10px;border-radius:8px;border:1px solid var(--matcha-mid);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">編集</button>'
+    +'<button onclick="deleteMemo(\''+m.id+'\')" style="font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">削除</button>'
+    +'</div></div>'
+    +'<div style="font-size:14px;color:var(--ink);line-height:1.7;white-space:pre-wrap;">'+(q?_hl(m.body,q):escText(m.body||''))+'</div>'+memoAttachHtml(m)
+    +'</div>';
+}
+function renderNoteMemo(){
+  var el=document.getElementById('cal-view-memo'); if(!el) return;
+  var q=(document.getElementById('note-memo-search')||{value:''}).value.trim();
+  var ql=q.toLowerCase();
+  var h='<div style="position:relative;margin-bottom:11px;">'
+    +'<input type="text" id="note-memo-search" oninput="renderNoteMemo()" value="'+escAttr(q)+'" placeholder="🔎 メモを検索（本文・タグ・日付）" style="width:100%;padding:11px 34px 11px 14px;font-size:14px;border:1.5px solid var(--matcha-mid);border-radius:12px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;">'
+    +(q?'<button onclick="document.getElementById(\'note-memo-search\').value=\'\';renderNoteMemo();" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:16px;color:var(--hint);cursor:pointer;padding:6px;">✕</button>':'')
+    +'</div>'
+    +'<button onclick="memoForDate(todayStr())" style="width:100%;margin-bottom:14px;padding:11px;border-radius:12px;border:1px dashed var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">＋ メモを追加</button>';
+
+  if(q){
+    var hits=allMemos.filter(function(m){ return ((m.body||'')+' '+((m.tags||[]).join(' '))+' '+(m.date||'')).toLowerCase().indexOf(ql)>=0; });
+    h+='<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">「'+escText(q)+'」の検索結果：'+hits.length+'件</div>';
+    h+=hits.length?hits.map(function(m){return _noteMemoCard(m,q);}).join(''):'<div style="text-align:center;color:var(--hint);padding:24px;">一致するメモはありません</div>';
+    el.innerHTML=h; return;
+  }
+  if(_noteMemoTag){
+    var tagMemos=allMemos.filter(function(m){ return m.tags&&m.tags.indexOf(_noteMemoTag)>=0; }).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><button onclick="noteMemoOpenTag(\'\')" style="font-size:13px;border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:5px 12px;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;color:var(--muted);">‹ フォルダ</button><span style="font-size:15px;font-weight:800;">🏷 '+escText(_noteMemoTag)+'</span><span style="font-size:11px;color:var(--hint);">'+tagMemos.length+'件</span></div>';
+    h+=tagMemos.length?tagMemos.map(function(m){return _noteMemoCard(m,'');}).join(''):'<div style="text-align:center;color:var(--hint);padding:24px;">メモがありません</div>';
+    el.innerHTML=h; return;
+  }
+  var pinned=allMemos.filter(function(m){return m.pinned;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  if(pinned.length){
+    h+='<div class="section-label">📌 固定したメモ</div>';
+    h+=pinned.map(function(m){return _noteMemoCard(m,'');}).join('');
+  }
+  var tagCount={};
+  allMemos.forEach(function(m){ (m.tags||[]).forEach(function(t){ tagCount[t]=(tagCount[t]||0)+1; }); });
+  var tags=Object.keys(tagCount).sort(function(a,b){return tagCount[b]-tagCount[a];});
+  h+='<div class="section-label">🗂 タグ別フォルダ</div>';
+  if(tags.length){
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">';
+    tags.forEach(function(t){
+      h+='<div onclick="noteMemoOpenTag(\''+t.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:9px;padding:13px 12px;border:1px solid var(--border);border-radius:13px;background:var(--surface);cursor:pointer;box-shadow:var(--shadow-sm);">'
+        +'<span style="font-size:22px;flex:none;">🗂</span><div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escText(t)+'</div><div style="font-size:11px;color:var(--hint);">'+tagCount[t]+'件</div></div></div>';
+    });
+    h+='</div>';
+  } else {
+    h+='<div style="text-align:center;color:var(--hint);padding:20px;font-size:13px;">タグ付きメモがありません</div>';
+  }
+  el.innerHTML=h;
 }
 function renderMemoList(){
   var el = document.getElementById('memo-list-content'); if(!el) return;
@@ -2260,15 +2301,16 @@ function deleteMemo(id){
   Object.keys(quickMemos).forEach(function(k){
     quickMemos[k] = (quickMemos[k]||[]).filter(function(m){ return m.id!==id; });
   });
-  saveMemos(); loadMemos(); renderMemoList(); renderCalendar();
+  saveMemos(); loadMemos(); renderMemoList(); renderCalendar(); try{ renderNoteMemo(); }catch(e){}
 }
 
 /* ---- カレンダー サブタブ ---- */
-var calTab = 'cal';
+var calTab = 'memo';
 function showCalTab(tab){
   if(tab==='activity') tab='gantt';
+  if(tab==='cal') tab='memo';
   calTab = tab;
-  ['cal','gantt'].forEach(function(t){
+  ['memo','gantt'].forEach(function(t){
     var v=document.getElementById('cal-view-'+t);
     var b=document.getElementById('cal-tab-'+t);
     if(v) v.style.display=t===tab?'':'none';
@@ -2277,6 +2319,7 @@ function showCalTab(tab){
       else { b.style.background='transparent'; b.style.color='var(--muted)'; b.style.boxShadow='none'; }
     }
   });
+  if(tab==='memo')     renderNoteMemo();
   if(tab==='gantt')    renderGantt();
 }
 
@@ -3270,7 +3313,28 @@ function renderTradeList(){
     +_chip('今日 平均単価',(_tq>0?Math.round(_ta/_tq).toLocaleString()+'円':'—'))
     +'</div>'
     +'<div style="font-size:10px;color:var(--hint);margin-bottom:8px;text-align:right;">表示中 '+list.length+'件 ／ '+(_vq>=1000?(_vq/1000).toFixed(2)+'t':Math.round(_vq).toLocaleString()+'kg')+' ／ '+( _va>=100000000?(_va/100000000).toFixed(2)+'億円':Math.round(_va/10000).toLocaleString()+'万円')+'</div>';
-  if(!list.length){el.innerHTML=_dash+'<div class="empty-state"><span class="empty-ico">📋</span>取引記録がありません<br><small>「記録」タブから追加してください</small></div>';return;}
+  // メモも検索（取引検索時に📝メモの本文・タグ・日付もヒット）
+  var memoHtml='';
+  if(q){
+    var memoHits=[];
+    Object.keys(quickMemos||{}).forEach(function(k){
+      (quickMemos[k]||[]).forEach(function(m){
+        if((((m.body||'')+' '+((m.tags||[]).join(' '))+' '+(m.date||'')).toLowerCase()).indexOf(q)>=0) memoHits.push(m);
+      });
+    });
+    if(memoHits.length){
+      memoHits.sort(function(a,b){return (b.date||'').localeCompare(a.date||'')||((b.createdAt||0)-(a.createdAt||0));});
+      memoHtml='<div class="section-label">📝 メモ（'+memoHits.length+'件）</div><div class="rows" style="border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm);margin-bottom:6px;">';
+      memoHits.forEach(function(m){
+        var raw=(m.body||''); if(raw.length>80) raw=raw.slice(0,80)+'…';
+        var dlab=m.date?m.date.slice(5).replace('-','/'):'日付なし';
+        var tg=(m.tags||[]).map(function(x){return '#'+x;}).join(' ');
+        memoHtml+='<div onclick="editMemo(\''+m.id+'\')" style="display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;"><span style="font-size:16px;flex:none;">📝</span><div style="flex:1;min-width:0;"><div style="font-size:13px;color:var(--ink);line-height:1.5;white-space:pre-wrap;word-break:break-word;">'+escText(raw)+'</div><div style="font-size:11px;color:var(--hint);margin-top:3px;">'+dlab+(tg?' ・ '+tg:'')+'</div></div><span style="color:var(--hint);flex:none;align-self:center;">›</span></div>';
+      });
+      memoHtml+='</div>';
+    }
+  }
+  if(!list.length){el.innerHTML=_dash+memoHtml+(memoHtml?'':'<div class="empty-state"><span class="empty-ico">📋</span>取引記録がありません<br><small>「記録」タブから追加してください</small></div>');return;}
   // 日付ごとにグルーピング
   var groups={}, order=[];
   list.forEach(function(t){ if(!groups[t.date]){groups[t.date]=[];order.push(t.date);} groups[t.date].push(t); });
@@ -3280,7 +3344,7 @@ function renderTradeList(){
     var tag=d===_today2?'今日':d===_yest?'昨日':'';
     return d.slice(5).replace('-','/')+'（'+wd+'）'+(tag?' ・ '+tag:'');
   }
-  var html=_dash;
+  var html=_dash+memoHtml;
   order.forEach(function(d){
     var arr=groups[d];
     var dq=arr.reduce(function(x,t){return x+(t.totalQty||0);},0);
@@ -6519,7 +6583,7 @@ function renderHome(){
   }
 
   /* ---- カレンダー ---- */
-  h+='<div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">カレンダー <button onclick="showScreen(\'calendar\');showCalTab(\'cal\')" style="font-size:11px;border:none;background:none;color:var(--matcha);font-weight:700;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">開く ›</button></div>';
+  h+='<div class="section-label">カレンダー</div>';
   h+='<div class="card" id="home-cal-card" style="padding:14px 14px 12px;"></div>';
 
   /* ---- ダッシュボード（生産家の進捗） ---- */
