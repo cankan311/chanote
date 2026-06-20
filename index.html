@@ -779,11 +779,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
   <!-- サブタブ -->
   <div class="seg" style="display:flex;gap:3px;margin-bottom:14px;background:var(--paper2);padding:3px;border-radius:13px;">
     <button id="cal-tab-memo"   onclick="showCalTab('memo')"   style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);">メモ帳</button>
-    <button id="cal-tab-teai"   onclick="openTeaiAlbum()"      style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">手合帳 ↗</button>
+    <button id="cal-tab-teai"   onclick="showCalTab('teai')" style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">手合帳</button>
     <button id="cal-tab-gantt"  onclick="showCalTab('gantt')"  style="flex:1;padding:9px 4px;font-size:13px;font-weight:700;border-radius:10px;border:none;cursor:pointer;font-family:'Noto Sans JP',sans-serif;background:transparent;color:var(--muted);">稼働表</button>
   </div>
   <!-- メモ帳ビュー -->
   <div id="cal-view-memo"></div>
+  <!-- 手合帳ビュー -->
+  <div id="cal-view-teai" style="display:none;"></div>
   <!-- 稼働ガントビュー -->
   <div id="cal-view-gantt" style="display:none;">
     <div id="gantt-content"></div>
@@ -2310,7 +2312,7 @@ function showCalTab(tab){
   if(tab==='activity') tab='gantt';
   if(tab==='cal') tab='memo';
   calTab = tab;
-  ['memo','gantt'].forEach(function(t){
+  ['memo','teai','gantt'].forEach(function(t){
     var v=document.getElementById('cal-view-'+t);
     var b=document.getElementById('cal-tab-'+t);
     if(v) v.style.display=t===tab?'':'none';
@@ -2320,6 +2322,7 @@ function showCalTab(tab){
     }
   });
   if(tab==='memo')     renderNoteMemo();
+  if(tab==='teai')     renderTeaicho();
   if(tab==='gantt')    renderGantt();
 }
 
@@ -7246,102 +7249,62 @@ function openShareChoice(date){
   ov.innerHTML='<div style="width:100%;max-width:460px;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));">'
     +'<div style="text-align:center;font-size:13px;font-weight:800;color:var(--muted);margin-bottom:12px;">共有方法を選ぶ</div>'
     +'<button onclick="document.getElementById(\'share-choice\').remove();shareDayImage(\''+date+'\')" style="width:100%;margin-bottom:9px;padding:13px 14px;border-radius:13px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;text-align:left;">📋 一覧を画像で共有<div style="font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;">その日の全取引（茶商別）を1枚に</div></button>'
-    +'<button onclick="document.getElementById(\'share-choice\').remove();openTeawaseSheet(\''+date+'\')" style="width:100%;margin-bottom:9px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;text-align:left;">📄 ハラダ製茶 手合表（A4横）<div style="font-size:11px;color:var(--matcha);font-weight:500;margin-top:2px;">ハラダ製茶向けの取引のみ・印刷／PDF／共有</div></button>'
+    +'<button onclick="document.getElementById(\'share-choice\').remove();openTeawaseAssign(\''+date+'\')" style="width:100%;margin-bottom:9px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;text-align:left;">📄 ハラダ製茶 手合表（A4横）<div style="font-size:11px;color:var(--matcha);font-weight:500;margin-top:2px;">ハラダ製茶向けの取引のみ・印刷／PDF／共有</div></button>'
     +'<button onclick="document.getElementById(\'share-choice\').remove()" style="width:100%;padding:12px;border-radius:13px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">キャンセル</button>'
   +'</div>';
   document.body.appendChild(ov);
 }
-function openTeawaseSheet(date){
-  // ★ハラダ製茶向けの取引のみ。他茶商の取引は絶対に含めない
-  var rows=trades.filter(function(t){ return t.date===date && String(t.buyerId)===String(HARADA_BUYER_ID); });
-  if(!rows.length){ toast('この日のハラダ製茶向けの取引はありません'); return; }
-  var comps=(typeof components!=='undefined' && components && components.length)?components.slice(0,3):['窒素','繊維','タンニン'];
-  var y=date.slice(0,4),mo=parseInt(date.slice(5,7),10),d=parseInt(date.slice(8,10),10);
+/* ===== 手合帳（ハラダ製茶 手合表）システム =====
+   ・共有時にワンクッションで生産家をページ群へ仕分け → 未編集フォルダ(localStorage)へ保存
+   ・手合帳タブ：未編集／編集済み(日付別)を一覧、開いて印刷・共有
+   ・保存は _safeLS（ocha_teaicho_v1 / ocha_teaicho_pmeta_v1）、バックアップはJSON書出/読込
+*/
+var TW_GLABEL={1:'通常（湯日地区）',2:'キタハイ経由',3:'手形・特殊',4:'納品日ずれ',5:'出物',9:'その他'};
+var TW_GORDER=[1,2,3,4,5,9];
 
-  function esc(s){ return escText(s==null?'':String(s)); }
-  function seasonAbbr(s){ if(!s) return ''; return String(s).replace('一番茶','一茶').replace('二番茶','二茶').replace('三番茶','三茶'); }
-  function symOf(name){
-    if(!name) return '';
-    var n=String(name).replace(/[（(][^）)]*[）)]/g,'');
-    var map={'下湯日':'日','湯日':'湯','吹木':'吹','鎌塚':'カ','サスキ':'サスキ'};
-    for(var k in map){ if(n.indexOf(k)===0) return map[k]; }
-    return n.charAt(0);
-  }
+function _twEsc(s){ return escText(s==null?'':String(s)); }
+function _twSeason(s){ if(!s) return ''; return String(s).replace('一番茶','一茶').replace('二番茶','二茶').replace('三番茶','三茶'); }
+function _twSym(name){
+  if(!name) return '';
+  var n=String(name).replace(/[（(][^）)]*[）)]/g,'');
+  var map={'下湯日':'日','湯日':'湯','吹木':'吹','鎌塚':'カ','サスキ':'サスキ'};
+  for(var k in map){ if(n.indexOf(k)===0) return map[k]; }
+  return n.charAt(0);
+}
+function _twProducer(pid){ return partners.find(function(p){return String(p.id)===String(pid);}); }
+function _twDerivedGroup(p){
+  if(!p) return 9;
+  var n=p.name||'';
+  if(/[（(]\s*出物\s*[）)]/.test(n)) return 5;
+  if(/キタハイ/.test(n)) return 2;
+  return 1;
+}
+function _twPMeta(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_pmeta_v1')||'{}'); }catch(e){ return {}; } }
+function _twPMetaSave(m){ try{ _safeLS.setItem('ocha_teaicho_pmeta_v1', JSON.stringify(m)); }catch(e){} }
+function _twGroupOf(pid, groups){
+  if(groups && groups[pid]!=null) return groups[pid];
+  var pm=_twPMeta(); if(pm[pid]!=null) return pm[pid];
+  return _twDerivedGroup(_twProducer(pid));
+}
+function _twRecs(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_v1')||'[]'); }catch(e){ return []; } }
+function _twRecsSave(a){ try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }catch(e){} }
+function _twRecGet(id){ return _twRecs().filter(function(r){return r.id===id;})[0]; }
+function _twRecUpsert(rec){ var a=_twRecs(); var i=-1; a.forEach(function(r,k){ if(r.id===rec.id) i=k; }); rec.updatedAt=Date.now(); if(i>=0)a[i]=rec; else a.push(rec); _twRecsSave(a); }
+function _twRecDelete(id){ _twRecsSave(_twRecs().filter(function(r){return r.id!==id;})); }
 
-  var KOU='<div class="tw-koutei"><div class="tw-pct">％</div><div class="tw-yen">円</div></div>';
-  var PAY='<div class="tw-pay"><div class="a"><div>現</div><div>・</div><div>手</div></div><div class="b">農通</div></div>';
-  var NOY='<div class="tw-noyaku"><div class="g"><div>有機</div><div>無農薬</div></div><div class="g"><div>US</div><div>TP</div></div></div>';
-  var GAP='<div class="tw-gapwrap"><div class="gtop"><div>SAGP　J-GAP</div><div>A-GAP　G-GAP</div></div><div class="gbot"><div>伸 中 F 冠</div><div>他（　）</div></div></div>';
+function _twHaradaTrades(date){ return trades.filter(function(t){ return t.date===date && String(t.buyerId)===String(HARADA_BUYER_ID); }); }
+function _twPagesFor(date, groups){
+  var rows=_twHaradaTrades(date), bucket={};
+  rows.forEach(function(t){ var g=_twGroupOf(t.producerId, groups); (bucket[g]=bucket[g]||[]).push(t); });
+  var keys=Object.keys(bucket).map(Number).sort(function(a,b){return a-b;});
+  var pages=[];
+  keys.forEach(function(g){ var arr=bucket[g]; for(var i=0;i<arr.length;i+=6){ pages.push({g:g, trades:arr.slice(i,i+6)}); } });
+  if(!pages.length) pages.push({g:1, trades:[]});
+  return pages;
+}
 
-  var totalQty=0;
-  var bodyRows=rows.map(function(t){
-    var prod=partners.find(function(p){return String(p.id)===String(t.producerId);});
-    var pname=prod?prod.name:'';
-    var demono=/[（(]\s*出物\s*[）)]\s*$/.test(pname);
-    var sym=symOf(pname);
-    var symHtml = sym ? (sym.length===1 ? '<span class="tw-cir">'+esc(sym)+'</span>' : '<span class="tw-sym">'+esc(sym)+'</span>') : '';
-    var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean);
-    var mark1=marks.length?esc(marks.join('　')):'';
-    totalQty += (t.totalQty!=null?t.totalQty:0);
-    var qty=(t.totalQty!=null?t.totalQty:0);
-    var price=(t.price!=null?t.price:0);
-    var kobiki=(t.kobiki!=null?t.kobiki:0);
-    var variety=esc(t.variety||'ヤブキタ');
-    var c=t.components||{};
-    function cv(k){ return (c[k]!=null && c[k]!=='')?esc(c[k]):'&nbsp;'; }
-    var memo=esc(t.memo||'');
-    return ''
-    +'<tr>'
-      +'<td></td>'
-      +'<td class="tw-c"><div class="tw-stk"><div>'+esc(seasonAbbr(t.season))+'</div>'+(demono?'<div>出物</div>':'')+'</div></td>'
-      +'<td class="tw-l"><div class="tw-ni">'+symHtml+'<span class="tw-mk">'+mark1+'</span></div></td>'
-      +'<td class="tw-c"><div class="tw-x">&times;</div></td>'
-      +'<td class="tw-r"><div class="tw-top">'+qty.toLocaleString()+'</div></td>'
-      +'<td class="tw-r"><div class="tw-top">'+price.toLocaleString()+'</div></td>'
-      +'<td class="tw-c"><div class="tw-top">'+kobiki+'</div></td>'
-      +'<td class="tw-c"><div class="tw-top">0.18</div></td>'
-      +'<td class="tw-c"><div class="tw-top">8</div></td>'
-      +'<td class="tw-c">'+KOU+'</td>'
-      +'<td class="tw-c">'+PAY+'</td>'
-      +'<td class="tw-l"><div class="tw-hin">'+variety+'　<span class="tw-pp">％</span></div></td>'
-      +'<td class="tw-c">'+NOY+'</td>'
-      +'<td class="tw-c">'+GAP+'</td>'
-      +'<td class="tw-r"><div class="tw-cmp"><div>'+cv(comps[0])+'</div><div>'+cv(comps[1])+'</div><div>'+cv(comps[2])+'</div></div></td>'
-      +'<td class="tw-l"><div class="tw-top tw-memo">'+memo+'</div></td>'
-      +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
-    +'</tr>';
-  }).join('');
-
-  var emptyRow=''
-    +'<tr>'
-      +'<td></td><td></td>'
-      +'<td class="tw-l"></td>'
-      +'<td class="tw-c"><div class="tw-x">&times;</div></td>'
-      +'<td></td><td></td><td></td><td></td><td></td>'
-      +'<td class="tw-c">'+KOU+'</td>'
-      +'<td class="tw-c">'+PAY+'</td>'
-      +'<td class="tw-l"><div class="tw-hin">ヤブキタ　<span class="tw-pp">％</span></div></td>'
-      +'<td class="tw-c">'+NOY+'</td>'
-      +'<td class="tw-c">'+GAP+'</td>'
-      +'<td class="tw-r"><div class="tw-cmp"><div>&nbsp;</div><div>&nbsp;</div><div>&nbsp;</div></div></td>'
-      +'<td></td>'
-      +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
-    +'</tr>';
-  var pad=''; for(var e=rows.length;e<6;e++){ pad+=emptyRow; }
-  var totalStr=(Math.round(totalQty*10)/10).toLocaleString();
-
-  var head=''
-    +'<colgroup>'
-      +'<col style="width:2.5%"><col style="width:3.5%"><col style="width:11%"><col style="width:7%"><col style="width:5.5%"><col style="width:5%"><col style="width:4%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:5%"><col style="width:5%"><col style="width:12%"><col style="width:6%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:4%">'
-    +'</colgroup>'
-    +'<tr class="tw-head">'
-      +'<th>No.</th><th>茶期</th><th>荷印（摘要）</th><th>入目 × 本数</th><th>数量(kg)</th><th>単価</th><th>粉引</th><th>宜協費</th><th>消費税</th><th>口銭</th><th>支払方法</th><th>品種</th><th>農薬対応</th><th>GAP / 茶種</th><th><div class="tw-cmh">全窒素<br>繊維質<br>タンニン</div></th><th>備考</th><th><div class="tw-cmh">官能<br>検査</div></th>'
-    +'</tr>';
-
-  var old=document.getElementById('teawase-sheet'); if(old) old.remove();
-  var ov=document.createElement('div'); ov.id='teawase-sheet';
-  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:#5b5b5b;display:flex;flex-direction:column;';
-  ov.innerHTML='<style>'
+function _twCSS(){
+  return '<style>'
     +'#teawase-sheet *{box-sizing:border-box;}'
     +"#teawase-sheet{font-family:'MS PGothic','Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP',sans-serif;}"
     +'#teawase-sheet .tw-page{width:1122px;height:793px;padding:30px 34px;background:#fff;color:#000;box-shadow:0 6px 24px rgba(0,0,0,.4);display:flex;flex-direction:column;}'
@@ -7390,45 +7353,274 @@ function openTeawaseSheet(date){
     +'#teawase-sheet .tw-chk td{border:1px solid #000;font-size:13px;width:78px;text-align:center;padding:4px;}'
     +'#teawase-sheet .tw-chk tr:last-child td{height:34px;color:#555;}'
     +'#teawase-sheet .tw-foot{text-align:center;font-size:13px;margin-top:6px;flex:none;}'
-    +'@media print{ html,body{background:#fff!important;margin:0!important;} body>*:not(#teawase-sheet){display:none!important;} #teawase-sheet{position:static!important;display:block!important;background:#fff!important;} #teawase-sheet .tw-noprint{display:none!important;} #teawase-sheet .tw-scroll{overflow:visible!important;padding:0!important;background:#fff!important;} #teawase-sheet .tw-stage{width:auto!important;height:auto!important;transform:none!important;} #teawase-sheet .tw-page{transform:none!important;width:100%!important;height:auto!important;padding:0!important;box-shadow:none!important;} @page{size:A4 landscape;margin:8mm;} }'
-    +'</style>'
-    +'<div class="tw-noprint" style="flex:none;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--surface);border-bottom:1px solid var(--border);">'
-      +'<button onclick="window.print()" style="padding:9px 15px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🖨 印刷 / PDF保存・共有</button>'
-      +'<button onclick="var s=document.getElementById(\'teawase-sheet\');if(s)s.remove();" style="padding:9px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button>'
-    +'</div>'
-    +'<div class="tw-scroll" style="flex:1;overflow:auto;padding:14px;background:#5b5b5b;">'
-      +'<div class="tw-stage" style="margin:0 auto;">'
-        +'<div class="tw-page">'
-          +'<div class="tw-corner">制定:2000.7.26／改訂:2020.5.4(第8版)1/1<br>作成:田辺圭太／審査:石川敦／承認:望月克則</div>'
-          +'<div class="tw-hd">'
-            +'<div class="tw-date">手合日　'+y+' 年 '+mo+' 月 '+d+' 日<br>納品日　'+y+' 年 '+mo+' 月 '+d+' 日</div>'
-            +'<div class="tw-title">手 合 表</div>'
-            +'<div class="tw-handler">JA大井川<br>扱者：'+esc(TEAWASE_HANDLER)+'</div>'
-          +'</div>'
-          +'<table class="tw">'+head+bodyRows+pad+'</table>'
-          +'<div class="tw-ft">'
-            +'<div class="tw-total">計 '+totalStr+'kg</div>'
-            +'<div class="tw-sign">サイン<span class="tw-sline"></span></div>'
-            +'<table class="tw-chk"><tr><td>入荷検査</td><td>事務入力</td></tr><tr><td>印</td><td>印</td></tr></table>'
-          +'</div>'
-          +'<div class="tw-foot">ハラダ製茶株式会社　品質マニュアル(HS-01)</div>'
-        +'</div>'
-      +'</div>'
-    +'</div>';
-  document.body.appendChild(ov);
+    +'#teawase-sheet .tw-stage{margin:0 auto 16px;}'
+    +'@media print{ html,body{background:#fff!important;margin:0!important;} body>*:not(#teawase-sheet){display:none!important;} #teawase-sheet{position:static!important;display:block!important;background:#fff!important;} #teawase-sheet .tw-noprint{display:none!important;} #teawase-sheet .tw-scroll{overflow:visible!important;padding:0!important;background:#fff!important;} #teawase-sheet .tw-stage{width:auto!important;height:auto!important;transform:none!important;margin:0!important;} #teawase-sheet .tw-page{transform:none!important;width:100%!important;height:auto!important;padding:0!important;box-shadow:none!important;break-after:page;page-break-after:always;} #teawase-sheet .tw-stage:last-child .tw-page{break-after:auto;page-break-after:auto;} @page{size:A4 landscape;margin:8mm;} }'
+    +'</style>';
+}
 
+function _twHead(){
+  return '<colgroup>'
+    +'<col style="width:2.5%"><col style="width:3.5%"><col style="width:11%"><col style="width:7%"><col style="width:5.5%"><col style="width:5%"><col style="width:4%"><col style="width:4.5%"><col style="width:4.5%"><col style="width:5%"><col style="width:5%"><col style="width:12%"><col style="width:6%"><col style="width:8%"><col style="width:5%"><col style="width:6%"><col style="width:4%">'
+    +'</colgroup>'
+    +'<tr class="tw-head">'
+    +'<th>No.</th><th>茶期</th><th>荷印（摘要）</th><th>入目 × 本数</th><th>数量(kg)</th><th>単価</th><th>粉引</th><th>宜協費</th><th>消費税</th><th>口銭</th><th>支払方法</th><th>品種</th><th>農薬対応</th><th>GAP / 茶種</th><th><div class="tw-cmh">全窒素<br>繊維質<br>タンニン</div></th><th>備考</th><th><div class="tw-cmh">官能<br>検査</div></th>'
+    +'</tr>';
+}
+var _TW_KOU='<div class="tw-koutei"><div class="tw-pct">％</div><div class="tw-yen">円</div></div>';
+var _TW_PAY='<div class="tw-pay"><div class="a"><div>現</div><div>・</div><div>手</div></div><div class="b">農通</div></div>';
+var _TW_NOY='<div class="tw-noyaku"><div class="g"><div>有機</div><div>無農薬</div></div><div class="g"><div>US</div><div>TP</div></div></div>';
+var _TW_GAP='<div class="tw-gapwrap"><div class="gtop"><div>SAGP　J-GAP</div><div>A-GAP　G-GAP</div></div><div class="gbot"><div>伸 中 F 冠</div><div>他（　）</div></div></div>';
+
+function _twRowHTML(t, comps){
+  var prod=_twProducer(t.producerId), pname=prod?prod.name:'';
+  var demono=/[（(]\s*出物\s*[）)]\s*$/.test(pname);
+  var sym=_twSym(pname);
+  var symHtml=sym?(sym.length===1?'<span class="tw-cir">'+_twEsc(sym)+'</span>':'<span class="tw-sym">'+_twEsc(sym)+'</span>'):'';
+  var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean);
+  var mark1=marks.length?_twEsc(marks.join('　')):'';
+  var qty=(t.totalQty!=null?t.totalQty:0), price=(t.price!=null?t.price:0), kobiki=(t.kobiki!=null?t.kobiki:0);
+  var variety=_twEsc(t.variety||'ヤブキタ'), c=t.components||{};
+  function cv(k){ return (c[k]!=null && c[k]!=='')?_twEsc(c[k]):'&nbsp;'; }
+  var memo=_twEsc(t.memo||'');
+  return '<tr>'
+    +'<td></td>'
+    +'<td class="tw-c"><div class="tw-stk"><div>'+_twEsc(_twSeason(t.season))+'</div>'+(demono?'<div>出物</div>':'')+'</div></td>'
+    +'<td class="tw-l"><div class="tw-ni">'+symHtml+'<span class="tw-mk">'+mark1+'</span></div></td>'
+    +'<td class="tw-c"><div class="tw-x">&times;</div></td>'
+    +'<td class="tw-r"><div class="tw-top">'+qty.toLocaleString()+'</div></td>'
+    +'<td class="tw-r"><div class="tw-top">'+price.toLocaleString()+'</div></td>'
+    +'<td class="tw-c"><div class="tw-top">'+kobiki+'</div></td>'
+    +'<td class="tw-c"><div class="tw-top">0.18</div></td>'
+    +'<td class="tw-c"><div class="tw-top">8</div></td>'
+    +'<td class="tw-c">'+_TW_KOU+'</td>'
+    +'<td class="tw-c">'+_TW_PAY+'</td>'
+    +'<td class="tw-l"><div class="tw-hin">'+variety+'　<span class="tw-pp">％</span></div></td>'
+    +'<td class="tw-c">'+_TW_NOY+'</td>'
+    +'<td class="tw-c">'+_TW_GAP+'</td>'
+    +'<td class="tw-r"><div class="tw-cmp"><div>'+cv(comps[0])+'</div><div>'+cv(comps[1])+'</div><div>'+cv(comps[2])+'</div></div></td>'
+    +'<td class="tw-l"><div class="tw-top tw-memo">'+memo+'</div></td>'
+    +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
+    +'</tr>';
+}
+var _TW_EMPTY='<tr>'
+  +'<td></td><td></td><td class="tw-l"></td>'
+  +'<td class="tw-c"><div class="tw-x">&times;</div></td>'
+  +'<td></td><td></td><td></td><td></td><td></td>'
+  +'<td class="tw-c">'+_TW_KOU+'</td>'
+  +'<td class="tw-c">'+_TW_PAY+'</td>'
+  +'<td class="tw-l"><div class="tw-hin">ヤブキタ　<span class="tw-pp">％</span></div></td>'
+  +'<td class="tw-c">'+_TW_NOY+'</td>'
+  +'<td class="tw-c">'+_TW_GAP+'</td>'
+  +'<td class="tw-r"><div class="tw-cmp"><div>&nbsp;</div><div>&nbsp;</div><div>&nbsp;</div></div></td>'
+  +'<td></td>'
+  +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
+  +'</tr>';
+
+function _twPageHTML(date, rows){
+  var comps=(typeof components!=='undefined' && components && components.length)?components.slice(0,3):['窒素','繊維','タンニン'];
+  var y=date.slice(0,4),mo=parseInt(date.slice(5,7),10),d=parseInt(date.slice(8,10),10);
+  var body=rows.map(function(t){return _twRowHTML(t,comps);}).join('');
+  var pad=''; for(var e=rows.length;e<6;e++){ pad+=_TW_EMPTY; }
+  var tot=0; rows.forEach(function(t){ tot+=(t.totalQty!=null?t.totalQty:0); });
+  var totalStr=(Math.round(tot*10)/10).toLocaleString();
+  return '<div class="tw-stage"><div class="tw-page">'
+    +'<div class="tw-corner">制定:2000.7.26／改訂:2020.5.4(第8版)1/1<br>作成:田辺圭太／審査:石川敦／承認:望月克則</div>'
+    +'<div class="tw-hd">'
+      +'<div class="tw-date">手合日　'+y+' 年 '+mo+' 月 '+d+' 日<br>納品日　'+y+' 年 '+mo+' 月 '+d+' 日</div>'
+      +'<div class="tw-title">手 合 表</div>'
+      +'<div class="tw-handler">JA大井川<br>扱者：'+_twEsc(TEAWASE_HANDLER)+'</div>'
+    +'</div>'
+    +'<table class="tw">'+_twHead()+body+pad+'</table>'
+    +'<div class="tw-ft">'
+      +'<div class="tw-total">計 '+totalStr+'kg</div>'
+      +'<div class="tw-sign">サイン<span class="tw-sline"></span></div>'
+      +'<table class="tw-chk"><tr><td>入荷検査</td><td>事務入力</td></tr><tr><td>印</td><td>印</td></tr></table>'
+    +'</div>'
+    +'<div class="tw-foot">ハラダ製茶株式会社　品質マニュアル(HS-01)</div>'
+  +'</div></div>';
+}
+
+function _twOpenOverlay(pages, opts){
+  opts=opts||{};
+  var old=document.getElementById('teawase-sheet'); if(old) old.remove();
+  var pagesHTML=pages.map(function(p){ return _twPageHTML(opts.date, p.trades); }).join('');
+  var ov=document.createElement('div'); ov.id='teawase-sheet';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:#5b5b5b;display:flex;flex-direction:column;';
+  var btns='<button data-act="print" style="padding:9px 15px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🖨 印刷 / PDF・共有</button>';
+  if(opts.mode==='draft') btns+='<button data-act="done" style="padding:9px 14px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:#3a7;color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✓ 編集済みにする</button>';
+  if(opts.mode==='done')  btns+='<button data-act="undone" style="padding:9px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↩ 未編集に戻す</button>';
+  btns+='<button data-act="close" style="padding:9px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button>';
+  ov.innerHTML=_twCSS()
+    +'<div class="tw-noprint" style="flex:none;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--surface);border-bottom:1px solid var(--border);">'+btns+'</div>'
+    +'<div class="tw-scroll" style="flex:1;overflow:auto;padding:14px;background:#5b5b5b;">'+pagesHTML+'</div>';
+  document.body.appendChild(ov);
+  function close(){ ov.remove(); }
+  ov.querySelectorAll('.tw-noprint [data-act]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var a=b.getAttribute('data-act');
+      if(a==='print'){ window.print(); }
+      else if(a==='close'){ close(); }
+      else if(a==='done' && opts.recId){ var r=_twRecGet(opts.recId); if(r){ r.status='done'; _twRecUpsert(r);} close(); if(typeof toast==='function')toast('編集済みにしました'); showCalTab('teai'); }
+      else if(a==='undone' && opts.recId){ var r2=_twRecGet(opts.recId); if(r2){ r2.status='draft'; _twRecUpsert(r2);} close(); if(typeof toast==='function')toast('未編集に戻しました'); showCalTab('teai'); }
+    });
+  });
   (function(){
-    var stage=ov.querySelector('.tw-stage'), pg=ov.querySelector('.tw-page'), scroll=ov.querySelector('.tw-scroll');
+    var scroll=ov.querySelector('.tw-scroll');
     function fit(){
-      var avail=scroll.clientWidth-20;
-      var s=Math.min(1, avail/1122);
-      pg.style.transformOrigin='top left';
-      pg.style.transform='scale('+s+')';
-      stage.style.width=(1122*s)+'px';
-      stage.style.height=(793*s)+'px';
+      var avail=scroll.clientWidth-20, s=Math.min(1, avail/1122);
+      ov.querySelectorAll('.tw-stage').forEach(function(st){
+        var pg=st.querySelector('.tw-page');
+        pg.style.transformOrigin='top left'; pg.style.transform='scale('+s+')';
+        st.style.width=(1122*s)+'px'; st.style.height=(793*s+16)+'px';
+      });
     }
     fit(); window.addEventListener('resize',fit);
   })();
+}
+
+/* 共有シートからのプレビュー（記録未保存） */
+function openTeawaseSheet(date){
+  if(!_twHaradaTrades(date).length){ if(typeof toast==='function')toast('この日のハラダ製茶向けの取引はありません'); return; }
+  _twOpenOverlay(_twPagesFor(date,null), {mode:'preview', date:date});
+}
+
+/* ===== ワンクッション：ページ群への仕分け ===== */
+function openTeawaseAssign(date, recId){
+  var day=_twHaradaTrades(date);
+  if(!day.length){ if(typeof toast==='function')toast('この日のハラダ製茶向けの取引はありません'); return; }
+  var rec=recId?_twRecGet(recId):null;
+  var groups=rec?rec.groups:null;
+  // 生産家ごとに集計
+  var seen=[], pinfo={};
+  day.forEach(function(t){ var pid=String(t.producerId); if(!pinfo[pid]){ pinfo[pid]={pid:pid, name:(_twProducer(pid)||{}).name||'(不明)', n:0, g:_twGroupOf(pid,groups)}; seen.push(pid);} pinfo[pid].n++; });
+
+  var old=document.getElementById('tw-assign'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='tw-assign';
+  ov.style.cssText='position:fixed;inset:0;z-index:2050;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  var optsHTML=TW_GORDER.map(function(g){ return '<option value="'+g+'">'+g+'：'+TW_GLABEL[g]+'</option>'; }).join('');
+  var listHTML=seen.map(function(pid){
+    var p=pinfo[pid];
+    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--border);">'
+      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(p.name)+'</div><div style="font-size:11px;color:var(--muted);">'+p.n+'件</div></div>'
+      +'<select data-pid="'+pid+'" class="tw-asg" style="padding:7px 8px;font-size:13px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;">'+optsHTML+'</select>'
+    +'</div>';
+  }).join('');
+  ov.innerHTML='<div style="width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));">'
+    +'<div style="text-align:center;font-size:14px;font-weight:800;color:var(--ink);margin-bottom:2px;">ページの振り分け</div>'
+    +'<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px;">'+date+'／生産家ごとにページ群を選ぶ（6件ごとに自動で次の用紙へ）</div>'
+    +'<div id="tw-asg-list" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;">'+listHTML+'</div>'
+    +'<div id="tw-asg-info" style="text-align:center;font-size:12px;font-weight:700;color:var(--matcha);margin:10px 0;"></div>'
+    +'<div style="display:flex;gap:8px;">'
+      +'<button data-act="preview" style="flex:1;padding:12px;border-radius:13px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">👁 プレビュー</button>'
+      +'<button data-act="save" style="flex:1.3;padding:12px;border-radius:13px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">📁 未編集に保存</button>'
+    +'</div>'
+    +'<button data-act="cancel" style="width:100%;padding:11px;margin-top:6px;border-radius:13px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">キャンセル</button>'
+  +'</div>';
+  document.body.appendChild(ov);
+  // 既定選択
+  ov.querySelectorAll('select.tw-asg').forEach(function(s){ s.value=String(pinfo[s.getAttribute('data-pid')].g); });
+  function readGroups(){ var g={}; ov.querySelectorAll('select.tw-asg').forEach(function(s){ g[s.getAttribute('data-pid')]=parseInt(s.value,10); }); return g; }
+  function refresh(){ var pages=_twPagesFor(date, readGroups()); ov.querySelector('#tw-asg-info').textContent='→ 全 '+pages.length+' 枚（A4横）'; }
+  ov.querySelectorAll('select.tw-asg').forEach(function(s){ s.addEventListener('change', refresh); });
+  refresh();
+  ov.querySelectorAll('[data-act]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var a=b.getAttribute('data-act');
+      if(a==='cancel'){ ov.remove(); return; }
+      if(a==='preview'){ _twOpenOverlay(_twPagesFor(date, readGroups()), {mode:'preview', date:date}); return; }
+      if(a==='save'){
+        var g=readGroups();
+        var pm=_twPMeta(); Object.keys(g).forEach(function(pid){ pm[pid]=g[pid]; }); _twPMetaSave(pm); // 次回の既定に記憶
+        var r=rec||{ id:'tw'+Date.now(), date:date, createdAt:Date.now() };
+        r.date=date; r.groups=g; r.status='draft';
+        _twRecUpsert(r);
+        ov.remove();
+        if(typeof toast==='function')toast('未編集フォルダに保存しました');
+        if(typeof showScreen==='function') showScreen('calendar');
+        calTab='teai'; showCalTab('teai');
+      }
+    });
+  });
+}
+
+/* ===== 手合帳タブ ビュー ===== */
+function twOpenRecord(id){ var r=_twRecGet(id); if(!r) return; _twOpenOverlay(_twPagesFor(r.date, r.groups), {mode:(r.status==='done'?'done':'draft'), recId:id, date:r.date}); }
+function twDeleteRecord(id){ if(!window.confirm('この手合帳を削除しますか？')) return; _twRecDelete(id); showCalTab('teai'); }
+
+function _twRecSummary(r){
+  var pages=_twPagesFor(r.date, r.groups);
+  var names=[]; _twHaradaTrades(r.date).forEach(function(t){ var nm=(_twProducer(t.producerId)||{}).name; if(nm && names.indexOf(nm)<0) names.push(nm); });
+  var ns=names.slice(0,4).join('・')+(names.length>4?' 他':'');
+  return {pages:pages.length, n:_twHaradaTrades(r.date).length, names:ns};
+}
+
+function renderTeaicho(){
+  var el=document.getElementById('cal-view-teai'); if(!el) return;
+  var recs=_twRecs().sort(function(a,b){ return (b.date||'').localeCompare(a.date||'')|| (b.updatedAt||0)-(a.updatedAt||0); });
+  var drafts=recs.filter(function(r){return r.status!=='done';});
+  var dones=recs.filter(function(r){return r.status==='done';});
+  function card(r){
+    var s=_twRecSummary(r);
+    var acts=(r.status==='done')
+      ? '<button data-act="open" data-id="'+r.id+'" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">開く（共有/印刷）</button>'
+        +'<button data-act="open" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">未編集に戻す</button>'
+      : '<button data-act="open" data-id="'+r.id+'" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">開く</button>'
+        +'<button data-act="assign" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">仕分け編集</button>';
+    return '<div style="background:var(--paper);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:9px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;"><div style="font-weight:800;font-size:15px;color:var(--ink);">'+_twEsc(r.date)+'</div><div style="font-size:11px;color:var(--muted);">全'+s.pages+'枚・'+s.n+'件</div></div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(s.names||'—')+'</div>'
+      +'<div style="display:flex;gap:6px;">'+acts+'<button data-act="del" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:#c44;font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">🗑</button></div>'
+    +'</div>';
+  }
+  var html='<div style="display:flex;gap:8px;margin-bottom:14px;">'
+      +'<button data-act="export" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">⬇ バックアップ書出</button>'
+      +'<button data-act="import" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">⬆ 読込</button>'
+    +'</div>';
+  html+='<div style="font-size:13px;font-weight:800;color:var(--ink);margin:4px 2px 8px;">未編集フォルダ '+(drafts.length?'（'+drafts.length+'）':'')+'</div>';
+  html+= drafts.length?drafts.map(card).join(''):'<div style="font-size:12px;color:var(--muted);padding:6px 2px 14px;">未編集の手合帳はありません。取引一覧の「共有」→「ハラダ製茶 手合表」から作成できます。</div>';
+  html+='<div style="font-size:13px;font-weight:800;color:var(--ink);margin:14px 2px 8px;">編集済み（日付別）'+(dones.length?'（'+dones.length+'）':'')+'</div>';
+  html+= dones.length?dones.map(card).join(''):'<div style="font-size:12px;color:var(--muted);padding:6px 2px;">編集済みの手合帳はありません。</div>';
+  el.innerHTML=html;
+  el.querySelectorAll('[data-act]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var a=b.getAttribute('data-act'), id=b.getAttribute('data-id');
+      if(a==='open') twOpenRecord(id);
+      else if(a==='assign'){ var r=_twRecGet(id); if(r) openTeawaseAssign(r.date, id); }
+      else if(a==='del') twDeleteRecord(id);
+      else if(a==='export') twExport();
+      else if(a==='import') twImport();
+    });
+  });
+}
+
+/* ===== バックアップ ===== */
+function twExport(){
+  var data={ app:'chanote-teaicho', v:1, exportedAt:new Date().toISOString(), teaicho:_twRecs(), pmeta:_twPMeta() };
+  try{
+    var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download='teaicho_backup_'+(new Date().toISOString().slice(0,10))+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+  }catch(e){ if(typeof toast==='function')toast('書き出しに失敗しました'); }
+}
+function twImport(){
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
+  inp.onchange=function(){
+    var f=inp.files&&inp.files[0]; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{
+        var d=JSON.parse(rd.result);
+        if(d.teaicho){ var cur=_twRecs(), map={}; cur.forEach(function(r){map[r.id]=r;}); d.teaicho.forEach(function(r){map[r.id]=r;}); _twRecsSave(Object.keys(map).map(function(k){return map[k];})); }
+        if(d.pmeta){ var pm=_twPMeta(); Object.keys(d.pmeta).forEach(function(k){pm[k]=d.pmeta[k];}); _twPMetaSave(pm); }
+        if(typeof toast==='function')toast('読み込みました'); showCalTab('teai');
+      }catch(e){ if(typeof toast==='function')toast('読み込みに失敗しました'); }
+    };
+    rd.readAsText(f);
+  };
+  inp.click();
 }
 function openDaySummary(date){
   _daySumDate = date || localDateStr(new Date(Date.now()-86400000));  // 既定は前日
