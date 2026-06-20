@@ -704,6 +704,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--matcha-mid)!important
       <span id="t-kobiki-custom-unit" style="display:none;font-size:13px;color:var(--muted);margin-left:6px;">%</span>
       <div id="t-kobiki-preview" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
     </div>
+    <div class="field-group"><label>出物</label><label style="display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;color:var(--ink);"><input type="checkbox" id="t-demono" style="width:19px;height:19px;">出物として記録（手合表で別紙にする）</label></div>
     <div class="field-group"><label>商談メモ</label><textarea id="t-memo" placeholder="商談内容、特記事項など..."></textarea></div>
     <button class="btn-primary" onclick="saveTrade()">💾 取引を保存する</button>
   </div>
@@ -3251,11 +3252,12 @@ function saveTrade(){
     if(el&&el.value!=='') comps[c]=parseFloat(el.value);
   });
   var kobikiPct=getKobikiPct();
-  trades.push({id:Date.now(),date:document.getElementById('t-date').value,season:seasonForDate(document.getElementById('t-date').value),producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,memo:document.getElementById('t-memo').value.trim()});
+  trades.push({id:Date.now(),date:document.getElementById('t-date').value,season:seasonForDate(document.getElementById('t-date').value),producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,demono:!!(document.getElementById('t-demono')&&document.getElementById('t-demono').checked),memo:document.getElementById('t-memo').value.trim()});
   save();
   document.getElementById('t-price').value='';
   document.getElementById('t-variety').value='';
   document.getElementById('t-memo').value='';
+  var _dEl=document.getElementById('t-demono'); if(_dEl)_dEl.checked=false;
   // 粉引きリセット
   document.querySelectorAll('#kobiki-btns .kobiki-btn').forEach(function(b){b.classList.remove('active');});
   var firstBtn=document.querySelector('#kobiki-btns .kobiki-btn');
@@ -3567,6 +3569,7 @@ function editTrade(id){
     +'</div>';
 
   html+=kobikiHtml;
+  html+=fld('出物','<label style="display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;color:var(--ink);"><input type="checkbox" id="edit-demono" '+(t.demono?'checked':'')+' style="width:19px;height:19px;">出物として記録（別紙にする）</label>');
   html+=fld('商談メモ','<textarea id="edit-memo" style="width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;height:82px;resize:vertical;">'+escText(t.memo||'')+'</textarea>');
   html+='<button class="btn-primary" onclick="updateTrade('+id+')">💾 変更を保存する</button>';
   html+='</div>';
@@ -3702,6 +3705,7 @@ function updateTrade(id){
   t.totalQty=totalQty;
   t.components=comps;
   t.memo=(document.getElementById('edit-memo')||{value:''}).value.trim();
+  t.demono=!!((document.getElementById('edit-demono')||{checked:false}).checked);
   save();
   renderAll();
   showTradeDetail(id);
@@ -7273,6 +7277,7 @@ function _twSym(name){
 }
 function _twProducer(pid){ return partners.find(function(p){return String(p.id)===String(pid);}); }
 function _twTradeDemono(t){
+  if(t && t.demono) return true;
   if(t && /出物/.test(t.season||'')) return true;
   var p=_twProducer(t.producerId);
   return !!(p && /[（(]\s*出物\s*[）)]/.test(p.name||''));
@@ -7294,6 +7299,41 @@ function _twGroupOf(t, groups){
   if(_twTradeDemono(t)) return 5;
   var pm=_twPMeta(); if(pm[t.producerId]!=null) return pm[t.producerId];
   return _twDerivedGroupT(t);
+}
+function _twVMeta(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_vmeta_v1')||'{}'); }catch(e){ return {}; } }
+function _twVMetaSave(m){ try{ _safeLS.setItem('ocha_teaicho_vmeta_v1', JSON.stringify(m)); }catch(e){} }
+function _twInitHinshu(t, ed){
+  if(ed && ed.hinshu && ed.hinshu.length) return ed.hinshu.map(function(v){return {name:v.name, pct:v.pct};});
+  var vm=_twVMeta(), names=vm[t.producerId];
+  if(names && names.length) return names.map(function(nm){return {name:nm, pct:''};});
+  var v=t.variety||'ヤブキタ';
+  return [{name:v, pct:(/ヤブキタ/.test(v)?100:'')}];
+}
+function _twHinshuCell(t, ed){
+  var list=_twInitHinshu(t, ed), n=list.length;
+  var fs=n<=4?13:(n===5?11:(n===6?10:(n===7?9:8)));
+  var lh=n<=4?1.45:1.18;
+  var rows=list.map(function(v){
+    var pct=(v.pct===''||v.pct==null)?'':(''+v.pct);
+    return '<div class="tw-hrow"><span class="tw-hnm">'+_twEsc(v.name||'')+'</span><span class="tw-hpc">'+_twEsc(pct)+'<span class="tw-pp">％</span></span></div>';
+  }).join('');
+  return '<div class="tw-hin" style="font-size:'+fs+'px;line-height:'+lh+';">'+rows+'</div>';
+}
+function _twInitIrume(t, ed){
+  if(ed && ed.irume && ed.irume.length) return ed.irume.map(function(v){return {me:v.me, hon:v.hon};});
+  return [{me:'', hon:''}];
+}
+function _twIrumeCell(ed){
+  var list=(ed&&ed.irume?ed.irume:[]).filter(function(v){ return (v.me!==''&&v.me!=null)||(v.hon!==''&&v.hon!=null); });
+  if(!list.length) return '<div class="tw-x">&times;</div>';
+  var n=list.length, just=(n===1?'center':'space-between'), fs=(n<=2?13:11);
+  var L=list.map(function(v){return '<div>'+_twEsc(v.me===''||v.me==null?'':(''+v.me))+'</div>';}).join('');
+  var R=list.map(function(v){return '<div>'+_twEsc(v.hon===''||v.hon==null?'':(''+v.hon))+'</div>';}).join('');
+  return '<div class="tw-ime" style="font-size:'+fs+'px;">'
+    +'<div class="tw-ime-l" style="justify-content:'+just+';">'+L+'</div>'
+    +'<div class="tw-ime-x">×</div>'
+    +'<div class="tw-ime-r" style="justify-content:'+just+';">'+R+'</div>'
+  +'</div>';
 }
 function _twRecs(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_v1')||'[]'); }catch(e){ return []; } }
 function _twRecsSave(a){ try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }catch(e){} }
@@ -7334,6 +7374,10 @@ function _twCSS(){
     +'#teawase-sheet .tw-memo{font-size:12px;white-space:normal;}'
     +'#teawase-sheet .tw-stk{padding:7px 3px 0;font-size:14px;line-height:1.55;}'
     +'#teawase-sheet .tw-x{height:80px;display:flex;align-items:center;justify-content:center;font-size:16px;}'
+    +'#teawase-sheet .tw-ime{display:flex;align-items:stretch;justify-content:center;height:80px;gap:3px;padding:6px 3px;}'
+    +'#teawase-sheet .tw-ime-l{flex:1;display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;}'
+    +'#teawase-sheet .tw-ime-x{flex:none;display:flex;align-items:center;font-size:15px;}'
+    +'#teawase-sheet .tw-ime-r{flex:1;display:flex;flex-direction:column;align-items:flex-start;line-height:1.2;}'
     +'#teawase-sheet .tw-ni{display:flex;align-items:flex-start;gap:4px;padding:8px 5px 0;font-size:15px;line-height:1.35;}'
     +'#teawase-sheet .tw-cir{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;height:1.7em;border:1.4px solid #000;border-radius:50%;font-size:14px;flex:none;}'
     +'#teawase-sheet .tw-sym{padding-top:2px;font-size:14px;}#teawase-sheet .tw-mk{padding-top:3px;}'
@@ -7343,7 +7387,10 @@ function _twCSS(){
     +'#teawase-sheet .tw-pay{display:flex;flex-direction:column;height:80px;}'
     +'#teawase-sheet .tw-pay .a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-around;font-size:13px;line-height:1.0;padding:4px 0;}'
     +'#teawase-sheet .tw-pay .b{font-size:12px;text-align:center;border-top:1px solid #000;padding:2px 0 5px;}'
-    +'#teawase-sheet .tw-hin{padding:8px 5px 0;font-size:13px;line-height:1.45;text-align:left;}'
+    +'#teawase-sheet .tw-hin{padding:6px 5px 0;font-size:13px;line-height:1.45;text-align:left;height:80px;overflow:hidden;}'
+    +'#teawase-sheet .tw-hin .tw-hrow{display:flex;justify-content:space-between;align-items:baseline;gap:4px;}'
+    +'#teawase-sheet .tw-hin .tw-hnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    +'#teawase-sheet .tw-hin .tw-hpc{white-space:nowrap;flex:none;}'
     +'#teawase-sheet .tw-pp{color:#000;}'
     +'#teawase-sheet .tw-noyaku{display:flex;flex-direction:column;height:80px;}'
     +'#teawase-sheet .tw-noyaku .g{flex:1;display:flex;flex-direction:column;justify-content:space-around;font-size:11px;line-height:1.0;}'
@@ -7380,7 +7427,7 @@ var _TW_PAY='<div class="tw-pay"><div class="a"><div>現</div><div>・</div><div
 var _TW_NOY='<div class="tw-noyaku"><div class="g"><div>有機</div><div>無農薬</div></div><div class="g"><div>US</div><div>TP</div></div></div>';
 var _TW_GAP='<div class="tw-gapwrap"><div class="gtop"><div>SAGP　J-GAP</div><div>A-GAP　G-GAP</div></div><div class="gbot"><div>伸 中 F 冠</div><div>他（　）</div></div></div>';
 
-function _twRowHTML(t, comps){
+function _twRowHTML(t, comps, ed){
   var prod=_twProducer(t.producerId), pname=prod?prod.name:'';
   var demono=_twTradeDemono(t);
   var sym=_twSym(pname);
@@ -7395,7 +7442,7 @@ function _twRowHTML(t, comps){
     +'<td></td>'
     +'<td class="tw-c"><div class="tw-stk"><div>'+_twEsc(_twSeason(t.season))+'</div>'+(demono?'<div>出物</div>':'')+'</div></td>'
     +'<td class="tw-l"><div class="tw-ni">'+symHtml+'<span class="tw-mk">'+mark1+'</span></div></td>'
-    +'<td class="tw-c"><div class="tw-x">&times;</div></td>'
+    +'<td class="tw-c">'+((ed&&ed.irume&&ed.irume.length)?_twIrumeCell(ed):'<div class="tw-x">&times;</div>')+'</td>'
     +'<td class="tw-r"><div class="tw-top">'+qty.toLocaleString()+'</div></td>'
     +'<td class="tw-r"><div class="tw-top">'+price.toLocaleString()+'</div></td>'
     +'<td class="tw-c"><div class="tw-top">'+kobiki+'</div></td>'
@@ -7403,7 +7450,7 @@ function _twRowHTML(t, comps){
     +'<td class="tw-c"><div class="tw-top">8</div></td>'
     +'<td class="tw-c">'+_TW_KOU+'</td>'
     +'<td class="tw-c">'+_TW_PAY+'</td>'
-    +'<td class="tw-l"><div class="tw-hin">'+variety+'　<span class="tw-pp">％</span></div></td>'
+    +'<td class="tw-l">'+_twHinshuCell(t, ed)+'</td>'
     +'<td class="tw-c">'+_TW_NOY+'</td>'
     +'<td class="tw-c">'+_TW_GAP+'</td>'
     +'<td class="tw-r"><div class="tw-cmp"><div>'+cv(comps[0])+'</div><div>'+cv(comps[1])+'</div><div>'+cv(comps[2])+'</div></div></td>'
@@ -7425,10 +7472,10 @@ var _TW_EMPTY='<tr>'
   +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
   +'</tr>';
 
-function _twPageHTML(date, rows){
+function _twPageHTML(date, rows, edits){
   var comps=(typeof components!=='undefined' && components && components.length)?components.slice(0,3):['窒素','繊維','タンニン'];
   var y=date.slice(0,4),mo=parseInt(date.slice(5,7),10),d=parseInt(date.slice(8,10),10);
-  var body=rows.map(function(t){return _twRowHTML(t,comps);}).join('');
+  var body=rows.map(function(t){return _twRowHTML(t,comps,(edits&&edits[t.id]));}).join('');
   var pad=''; for(var e=rows.length;e<6;e++){ pad+=_TW_EMPTY; }
   var tot=0; rows.forEach(function(t){ tot+=(t.totalQty!=null?t.totalQty:0); });
   var totalStr=(Math.round(tot*10)/10).toLocaleString();
@@ -7452,7 +7499,7 @@ function _twPageHTML(date, rows){
 function _twOpenOverlay(pages, opts){
   opts=opts||{};
   var old=document.getElementById('teawase-sheet'); if(old) old.remove();
-  var pagesHTML=pages.map(function(p){ return _twPageHTML(opts.date, p.trades); }).join('');
+  var pagesHTML=pages.map(function(p){ return _twPageHTML(opts.date, p.trades, opts.edits); }).join('');
   var ov=document.createElement('div'); ov.id='teawase-sheet';
   ov.style.cssText='position:fixed;inset:0;z-index:2000;background:#5b5b5b;display:flex;flex-direction:column;';
   var btns='<button data-act="print" style="padding:9px 15px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🖨 印刷 / PDF・共有</button>';
@@ -7558,7 +7605,7 @@ function openTeawaseAssign(date, recId){
 }
 
 /* ===== 手合帳タブ ビュー ===== */
-function twOpenRecord(id){ var r=_twRecGet(id); if(!r) return; _twOpenOverlay(_twPagesFor(r.date, r.groups), {mode:(r.status==='done'?'done':'draft'), recId:id, date:r.date}); }
+function twOpenRecord(id){ var r=_twRecGet(id); if(!r) return; _twOpenOverlay(_twPagesFor(r.date, r.groups), {mode:(r.status==='done'?'done':'draft'), recId:id, date:r.date, edits:r.edits}); }
 function twDeleteRecord(id){ if(!window.confirm('この手合帳を削除しますか？')) return; _twRecDelete(id); showCalTab('teai'); }
 
 function _twRecSummary(r){
@@ -7578,8 +7625,9 @@ function renderTeaicho(){
     var acts=(r.status==='done')
       ? '<button data-act="open" data-id="'+r.id+'" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">開く（共有/印刷）</button>'
         +'<button data-act="open" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">未編集に戻す</button>'
-      : '<button data-act="open" data-id="'+r.id+'" style="flex:1;padding:8px;border-radius:9px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">開く</button>'
-        +'<button data-act="assign" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">仕分け編集</button>';
+      : '<button data-act="edit" data-id="'+r.id+'" style="flex:1;padding:8px;border-radius:9px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">✏️ 品種を編集</button>'
+        +'<button data-act="open" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">👁</button>'
+        +'<button data-act="assign" data-id="'+r.id+'" style="padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">🧩 仕分け</button>';
     return '<div style="background:var(--paper);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:9px;">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;"><div style="font-weight:800;font-size:15px;color:var(--ink);">'+_twEsc(r.date)+'</div><div style="font-size:11px;color:var(--muted);">全'+s.pages+'枚・'+s.n+'件</div></div>'
       +'<div style="font-size:11px;color:var(--muted);margin-bottom:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(s.names||'—')+'</div>'
@@ -7598,11 +7646,139 @@ function renderTeaicho(){
   el.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){
       var a=b.getAttribute('data-act'), id=b.getAttribute('data-id');
-      if(a==='open') twOpenRecord(id);
+      if(a==='edit') twEditRecord(id);
+      else if(a==='open') twOpenRecord(id);
       else if(a==='assign'){ var r=_twRecGet(id); if(r) openTeawaseAssign(r.date, id); }
       else if(a==='del') twDeleteRecord(id);
       else if(a==='export') twExport();
       else if(a==='import') twImport();
+    });
+  });
+}
+
+/* ===== 品種の編集（未編集レコード） ===== */
+function twEditRecord(id){
+  var rec=_twRecGet(id); if(!rec) return;
+  var day=_twHaradaTrades(rec.date);
+  if(!day.length){ if(typeof toast==='function')toast('取引がありません'); return; }
+  rec.edits=rec.edits||{};
+  var byId={}, state={};
+  day.forEach(function(t){ byId[t.id]=t; state[t.id]={ hinshu:_twInitHinshu(t, rec.edits[t.id]), irume:_twInitIrume(t, rec.edits[t.id]) }; });
+
+  var old=document.getElementById('tw-edit'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='tw-edit';
+  ov.style.cssText='position:fixed;inset:0;z-index:2060;background:var(--surface);display:flex;flex-direction:column;';
+  var vlist=(typeof varieties!=='undefined'&&varieties)?varieties:[];
+  var dataOpts=vlist.map(function(v){return '<option value="'+_twEsc(v)+'">';}).join('');
+  ov.innerHTML='<datalist id="tw-vlist">'+dataOpts+'</datalist>'
+    +'<div style="flex:none;display:flex;align-items:center;gap:8px;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--paper);border-bottom:1px solid var(--border);">'
+      +'<div style="font-weight:800;font-size:15px;color:var(--ink);">項目の編集 <span style="font-size:12px;color:var(--muted);font-weight:600;">'+_twEsc(rec.date)+'</span></div>'
+      +'<button data-act="cancel" style="padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">閉じる</button>'
+    +'</div>'
+    +'<div id="tw-edit-body" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;"></div>'
+    +'<div style="flex:none;display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--border);">'
+      +'<button data-act="save" style="flex:1;padding:13px;border-radius:12px;border:none;background:var(--matcha);color:#fff;font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">💾 保存</button>'
+      +'<button data-act="preview" style="padding:13px 14px;border-radius:12px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">👁 プレビュー</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  var body=ov.querySelector('#tw-edit-body');
+  function numOrBlank(x){ return x===''?'':parseFloat(x); }
+  var inStyle='padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;';
+  var delStyle='flex:none;width:34px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:#c44;font-size:14px;cursor:pointer;';
+
+  function vrow(tid, idx){
+    var v=state[tid].hinshu[idx];
+    return '<div class="tw-vrow" data-tid="'+tid+'" data-idx="'+idx+'" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
+      +'<input class="tw-vn" list="tw-vlist" value="'+_twEsc(v.name||'')+'" placeholder="品種名" style="flex:1;min-width:0;'+inStyle+'">'
+      +'<input class="tw-vp" type="number" inputmode="decimal" step="0.01" value="'+(v.pct===''||v.pct==null?'':_twEsc(''+v.pct))+'" placeholder="％" style="width:74px;text-align:right;'+inStyle+'">'
+      +'<button class="tw-vdel" style="'+delStyle+'">✕</button>'
+    +'</div>';
+  }
+  function irow(tid, idx){
+    var v=state[tid].irume[idx];
+    return '<div class="tw-irow" data-tid="'+tid+'" data-idx="'+idx+'" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
+      +'<input class="tw-ime-me" type="number" inputmode="decimal" step="0.1" value="'+(v.me===''||v.me==null?'':_twEsc(''+v.me))+'" placeholder="入目kg" style="flex:1;min-width:0;text-align:right;'+inStyle+'">'
+      +'<span style="color:var(--muted);font-weight:700;">×</span>'
+      +'<input class="tw-ime-hon" type="number" inputmode="numeric" step="1" value="'+(v.hon===''||v.hon==null?'':_twEsc(''+v.hon))+'" placeholder="本数" style="width:74px;text-align:right;'+inStyle+'">'
+      +'<button class="tw-idel" style="'+delStyle+'">✕</button>'
+    +'</div>';
+  }
+  function cardHTML(t){
+    var p=_twProducer(t.producerId), nm=p?p.name:'(不明)';
+    var demo=_twTradeDemono(t), season=_twSeason(t.season);
+    var mark=((t.lots||[]).map(function(l){return l.mark;}).filter(Boolean)[0])||'';
+    var vH=state[t.id].hinshu.map(function(_x,i){return vrow(t.id,i);}).join('');
+    var iH=state[t.id].irume.map(function(_x,i){return irow(t.id,i);}).join('');
+    return '<div class="tw-ecard" data-tid="'+t.id+'" style="background:var(--paper);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:12px;">'
+      +'<div style="font-weight:800;font-size:14px;color:var(--ink);margin-bottom:1px;">'+_twEsc(nm)+(demo?' <span style="color:#c70;">出物</span>':'')+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">'+_twEsc(season)+(mark?'／'+_twEsc(mark):'')+'</div>'
+      +'<div style="font-size:11px;font-weight:800;color:var(--muted);margin:2px 0 6px;">品種</div>'
+      +'<div class="tw-vrows">'+vH+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 12px;">'
+        +'<button class="tw-vadd" style="padding:6px 11px;border-radius:9px;border:1px dashed var(--border);background:transparent;color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">＋ 品種</button>'
+        +'<div class="tw-vsum" style="font-size:12px;font-weight:700;color:var(--muted);"></div>'
+      +'</div>'
+      +'<div style="font-size:11px;font-weight:800;color:var(--muted);margin:2px 0 6px;">入目 × 本数</div>'
+      +'<div class="tw-irows">'+iH+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">'
+        +'<button class="tw-iadd" style="padding:6px 11px;border-radius:9px;border:1px dashed var(--border);background:transparent;color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">＋ 段（最大3）</button>'
+        +'<div class="tw-ichk" style="font-size:12px;font-weight:700;color:var(--muted);"></div>'
+      +'</div>'
+    +'</div>';
+  }
+  function readCard(tid){
+    var h=[]; body.querySelectorAll('.tw-vrow[data-tid="'+tid+'"]').forEach(function(r){ h.push({name:r.querySelector('.tw-vn').value.trim(), pct:numOrBlank(r.querySelector('.tw-vp').value)}); });
+    var im=[]; body.querySelectorAll('.tw-irow[data-tid="'+tid+'"]').forEach(function(r){ im.push({me:numOrBlank(r.querySelector('.tw-ime-me').value), hon:numOrBlank(r.querySelector('.tw-ime-hon').value)}); });
+    state[tid].hinshu=h; state[tid].irume=im; return state[tid];
+  }
+  function sumOf(tid){
+    var card=body.querySelector('.tw-ecard[data-tid="'+tid+'"]'); if(!card) return;
+    var sum=0, has=false;
+    (state[tid].hinshu||[]).forEach(function(v){ if(v.pct!==''&&v.pct!=null&&!isNaN(v.pct)){ sum+=Number(v.pct); has=true; } });
+    var el=card.querySelector('.tw-vsum'); if(!has){ el.textContent=''; return; }
+    var r=Math.round(sum*100)/100; el.textContent='合計 '+r+'％';
+    el.style.color=(Math.abs(r-100)<0.05)?'var(--matcha)':'#c44';
+  }
+  function checkOf(tid){
+    var card=body.querySelector('.tw-ecard[data-tid="'+tid+'"]'); if(!card) return;
+    var sum=0, has=false;
+    (state[tid].irume||[]).forEach(function(v){ if(v.me!==''&&v.me!=null&&!isNaN(v.me)&&v.hon!==''&&v.hon!=null&&!isNaN(v.hon)){ sum+=Number(v.me)*Number(v.hon); has=true; } });
+    var el=card.querySelector('.tw-ichk'); if(!has){ el.textContent=''; return; }
+    var t=byId[tid], qty=(t&&t.totalQty!=null)?t.totalQty:null, r=Math.round(sum*10)/10;
+    el.textContent='= '+r+'kg'+(qty!=null?'（数量 '+qty+'）':'');
+    el.style.color=(qty!=null&&Math.abs(r-qty)<0.5)?'var(--matcha)':'#c44';
+  }
+  function bind(){
+    body.querySelectorAll('.tw-vn,.tw-vp').forEach(function(inp){ inp.addEventListener('input',function(){ var tid=inp.closest('.tw-vrow').getAttribute('data-tid'); readCard(tid); sumOf(tid); }); });
+    body.querySelectorAll('.tw-ime-me,.tw-ime-hon').forEach(function(inp){ inp.addEventListener('input',function(){ var tid=inp.closest('.tw-irow').getAttribute('data-tid'); readCard(tid); checkOf(tid); }); });
+    body.querySelectorAll('.tw-vdel').forEach(function(b){ b.addEventListener('click',function(){ var row=b.closest('.tw-vrow'), tid=row.getAttribute('data-tid'); readCard(tid); state[tid].hinshu.splice(parseInt(row.getAttribute('data-idx'),10),1); if(!state[tid].hinshu.length) state[tid].hinshu=[{name:'',pct:''}]; render(); }); });
+    body.querySelectorAll('.tw-idel').forEach(function(b){ b.addEventListener('click',function(){ var row=b.closest('.tw-irow'), tid=row.getAttribute('data-tid'); readCard(tid); state[tid].irume.splice(parseInt(row.getAttribute('data-idx'),10),1); if(!state[tid].irume.length) state[tid].irume=[{me:'',hon:''}]; render(); }); });
+    body.querySelectorAll('.tw-vadd').forEach(function(b){ b.addEventListener('click',function(){ var tid=b.closest('.tw-ecard').getAttribute('data-tid'); readCard(tid); state[tid].hinshu.push({name:'',pct:''}); render(); }); });
+    body.querySelectorAll('.tw-iadd').forEach(function(b){ b.addEventListener('click',function(){ var tid=b.closest('.tw-ecard').getAttribute('data-tid'); readCard(tid); if(state[tid].irume.length<3) state[tid].irume.push({me:'',hon:''}); render(); }); });
+  }
+  function render(){ body.innerHTML=day.map(cardHTML).join(''); bind(); day.forEach(function(t){ sumOf(t.id); checkOf(t.id); }); }
+  render();
+
+  function persist(){
+    var vm=_twVMeta();
+    day.forEach(function(t){
+      readCard(t.id);
+      var hs=state[t.id].hinshu.filter(function(v){return (v.name||'').trim()!=='';});
+      var im=state[t.id].irume.filter(function(v){return (v.me!==''&&v.me!=null)||(v.hon!==''&&v.hon!=null);});
+      rec.edits[t.id]=rec.edits[t.id]||{};
+      rec.edits[t.id].hinshu=hs;
+      rec.edits[t.id].irume=im;
+      var names=hs.map(function(v){return v.name;});
+      if(names.length) vm[t.producerId]=names;
+    });
+    _twVMetaSave(vm); _twRecUpsert(rec);
+  }
+  ov.querySelectorAll('[data-act]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var a=b.getAttribute('data-act');
+      if(a==='cancel'){ ov.remove(); return; }
+      if(a==='save'){ persist(); ov.remove(); if(typeof toast==='function')toast('保存しました'); showCalTab('teai'); return; }
+      if(a==='preview'){ persist(); _twOpenOverlay(_twPagesFor(rec.date, rec.groups), {mode:'draft', recId:rec.id, date:rec.date, edits:rec.edits}); return; }
     });
   });
 }
