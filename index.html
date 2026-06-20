@@ -7263,7 +7263,7 @@ var TW_GLABEL={1:'通常（湯日地区）',2:'キタハイ経由',3:'手形・�
 var TW_GORDER=[1,2,3,4,5,9];
 
 function _twEsc(s){ return escText(s==null?'':String(s)); }
-function _twSeason(s){ if(!s) return ''; return String(s).replace('一番茶','一茶').replace('二番茶','二茶').replace('三番茶','三茶'); }
+function _twSeason(s){ if(!s) return ''; return String(s).replace('出物','').replace('一番茶','一茶').replace('二番茶','二茶').replace('三番茶','三茶').trim(); }
 function _twSym(name){
   if(!name) return '';
   var n=String(name).replace(/[（(][^）)]*[）)]/g,'');
@@ -7272,19 +7272,28 @@ function _twSym(name){
   return n.charAt(0);
 }
 function _twProducer(pid){ return partners.find(function(p){return String(p.id)===String(pid);}); }
-function _twDerivedGroup(p){
-  if(!p) return 9;
-  var n=p.name||'';
-  if(/[（(]\s*出物\s*[）)]/.test(n)) return 5;
-  if(/キタハイ/.test(n)) return 2;
-  return 1;
+function _twTradeDemono(t){
+  if(t && /出物/.test(t.season||'')) return true;
+  var p=_twProducer(t.producerId);
+  return !!(p && /[（(]\s*出物\s*[）)]/.test(p.name||''));
+}
+function _twIsKitahai(p){ return !!(p && /キタハイ/.test(p.name||'')); }
+function _twIsTegata(p){ return !!(p && /[◯〇○⭕]ヤ/.test(p.name||'')); }
+function _twDerivedGroupT(t){
+  if(_twTradeDemono(t)) return 5;                 // 出物（最優先で別紙）
+  var p=_twProducer(t.producerId);
+  if(_twIsKitahai(p)) return 2;                   // JA大井川キタハイ経由
+  if(_twIsTegata(p))  return 3;                   // 手形（◯ヤ）
+  return 1;                                       // 通常（湯日地区）
 }
 function _twPMeta(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_pmeta_v1')||'{}'); }catch(e){ return {}; } }
 function _twPMetaSave(m){ try{ _safeLS.setItem('ocha_teaicho_pmeta_v1', JSON.stringify(m)); }catch(e){} }
-function _twGroupOf(pid, groups){
-  if(groups && groups[pid]!=null) return groups[pid];
-  var pm=_twPMeta(); if(pm[pid]!=null) return pm[pid];
-  return _twDerivedGroup(_twProducer(pid));
+// groups は取引ID(t.id)キーの上書き。precedence: 取引上書き > 出物 > 生産家既定(pmeta) > ルール判定
+function _twGroupOf(t, groups){
+  if(groups && groups[t.id]!=null) return groups[t.id];
+  if(_twTradeDemono(t)) return 5;
+  var pm=_twPMeta(); if(pm[t.producerId]!=null) return pm[t.producerId];
+  return _twDerivedGroupT(t);
 }
 function _twRecs(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_v1')||'[]'); }catch(e){ return []; } }
 function _twRecsSave(a){ try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }catch(e){} }
@@ -7295,7 +7304,7 @@ function _twRecDelete(id){ _twRecsSave(_twRecs().filter(function(r){return r.id!
 function _twHaradaTrades(date){ return trades.filter(function(t){ return t.date===date && String(t.buyerId)===String(HARADA_BUYER_ID); }); }
 function _twPagesFor(date, groups){
   var rows=_twHaradaTrades(date), bucket={};
-  rows.forEach(function(t){ var g=_twGroupOf(t.producerId, groups); (bucket[g]=bucket[g]||[]).push(t); });
+  rows.forEach(function(t){ var g=_twGroupOf(t, groups); (bucket[g]=bucket[g]||[]).push(t); });
   var keys=Object.keys(bucket).map(Number).sort(function(a,b){return a-b;});
   var pages=[];
   keys.forEach(function(g){ var arr=bucket[g]; for(var i=0;i<arr.length;i+=6){ pages.push({g:g, trades:arr.slice(i,i+6)}); } });
@@ -7373,7 +7382,7 @@ var _TW_GAP='<div class="tw-gapwrap"><div class="gtop"><div>SAGP　J-GAP</div><d
 
 function _twRowHTML(t, comps){
   var prod=_twProducer(t.producerId), pname=prod?prod.name:'';
-  var demono=/[（(]\s*出物\s*[）)]\s*$/.test(pname);
+  var demono=_twTradeDemono(t);
   var sym=_twSym(pname);
   var symHtml=sym?(sym.length===1?'<span class="tw-cir">'+_twEsc(sym)+'</span>':'<span class="tw-sym">'+_twEsc(sym)+'</span>'):'';
   var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean);
@@ -7490,25 +7499,30 @@ function openTeawaseAssign(date, recId){
   if(!day.length){ if(typeof toast==='function')toast('この日のハラダ製茶向けの取引はありません'); return; }
   var rec=recId?_twRecGet(recId):null;
   var groups=rec?rec.groups:null;
-  // 生産家ごとに集計
-  var seen=[], pinfo={};
-  day.forEach(function(t){ var pid=String(t.producerId); if(!pinfo[pid]){ pinfo[pid]={pid:pid, name:(_twProducer(pid)||{}).name||'(不明)', n:0, g:_twGroupOf(pid,groups)}; seen.push(pid);} pinfo[pid].n++; });
 
   var old=document.getElementById('tw-assign'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='tw-assign';
   ov.style.cssText='position:fixed;inset:0;z-index:2050;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
   var optsHTML=TW_GORDER.map(function(g){ return '<option value="'+g+'">'+g+'：'+TW_GLABEL[g]+'</option>'; }).join('');
-  var listHTML=seen.map(function(pid){
-    var p=pinfo[pid];
-    return '<div style="display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--border);">'
-      +'<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(p.name)+'</div><div style="font-size:11px;color:var(--muted);">'+p.n+'件</div></div>'
-      +'<select data-pid="'+pid+'" class="tw-asg" style="padding:7px 8px;font-size:13px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;">'+optsHTML+'</select>'
+  // 取引ごとに行を作る（出物は同じ生産家でも別紙にできる）
+  var listHTML=day.map(function(t){
+    var p=_twProducer(t.producerId), nm=p?p.name:'(不明)';
+    var demo=_twTradeDemono(t);
+    var season=_twSeason(t.season);
+    var mark=((t.lots||[]).map(function(l){return l.mark;}).filter(Boolean)[0])||'';
+    var sub=(season||'')+(demo?'・出物':'')+(mark?'／'+mark:'');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border);">'
+      +'<div style="flex:1;min-width:0;">'
+        +'<div style="font-weight:700;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(nm)+(demo?' <span style="color:#c70;font-weight:800;">出物</span>':'')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_twEsc(sub)+'</div>'
+      +'</div>'
+      +'<select data-tid="'+t.id+'" class="tw-asg" style="padding:7px 8px;font-size:13px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;">'+optsHTML+'</select>'
     +'</div>';
   }).join('');
   ov.innerHTML='<div style="width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));">'
     +'<div style="text-align:center;font-size:14px;font-weight:800;color:var(--ink);margin-bottom:2px;">ページの振り分け</div>'
-    +'<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px;">'+date+'／生産家ごとにページ群を選ぶ（6件ごとに自動で次の用紙へ）</div>'
+    +'<div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px;">'+date+'／取引ごとにページ群を選ぶ（6件ごとに自動で次の用紙へ）</div>'
     +'<div id="tw-asg-list" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;">'+listHTML+'</div>'
     +'<div id="tw-asg-info" style="text-align:center;font-size:12px;font-weight:700;color:var(--matcha);margin:10px 0;"></div>'
     +'<div style="display:flex;gap:8px;">'
@@ -7518,11 +7532,11 @@ function openTeawaseAssign(date, recId){
     +'<button data-act="cancel" style="width:100%;padding:11px;margin-top:6px;border-radius:13px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">キャンセル</button>'
   +'</div>';
   document.body.appendChild(ov);
-  // 既定選択
-  ov.querySelectorAll('select.tw-asg').forEach(function(s){ s.value=String(pinfo[s.getAttribute('data-pid')].g); });
-  function readGroups(){ var g={}; ov.querySelectorAll('select.tw-asg').forEach(function(s){ g[s.getAttribute('data-pid')]=parseInt(s.value,10); }); return g; }
-  function refresh(){ var pages=_twPagesFor(date, readGroups()); ov.querySelector('#tw-asg-info').textContent='→ 全 '+pages.length+' 枚（A4横）'; }
-  ov.querySelectorAll('select.tw-asg').forEach(function(s){ s.addEventListener('change', refresh); });
+  var byId={}; day.forEach(function(t){ byId[String(t.id)]=t; });
+  ov.querySelectorAll('select.tw-asg').forEach(function(sel){ sel.value=String(_twGroupOf(byId[sel.getAttribute('data-tid')], groups)); });
+  function readGroups(){ var g={}; ov.querySelectorAll('select.tw-asg').forEach(function(sel){ g[sel.getAttribute('data-tid')]=parseInt(sel.value,10); }); return g; }
+  function refresh(){ var pages=_twPagesFor(date, readGroups()); ov.querySelector('#tw-asg-info').textContent='\u2192 \u5168 '+pages.length+' \u679a\uff08A4\u6a2a\uff09'; }
+  ov.querySelectorAll('select.tw-asg').forEach(function(sel){ sel.addEventListener('change', refresh); });
   refresh();
   ov.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){
@@ -7531,7 +7545,6 @@ function openTeawaseAssign(date, recId){
       if(a==='preview'){ _twOpenOverlay(_twPagesFor(date, readGroups()), {mode:'preview', date:date}); return; }
       if(a==='save'){
         var g=readGroups();
-        var pm=_twPMeta(); Object.keys(g).forEach(function(pid){ pm[pid]=g[pid]; }); _twPMetaSave(pm); // 次回の既定に記憶
         var r=rec||{ id:'tw'+Date.now(), date:date, createdAt:Date.now() };
         r.date=date; r.groups=g; r.status='draft';
         _twRecUpsert(r);
