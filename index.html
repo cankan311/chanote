@@ -7236,6 +7236,86 @@ function _editFromSummary(id){
   var s=document.getElementById('day-summary'); if(s) s.remove();
   showTradeDetail(id);
 }
+var HARADA_BUYER_ID=1779007987502;   // ハラダ製茶（手合表はこの茶商向けのみ）
+var TEAWASE_HANDLER='成岡';
+function openShareChoice(date){
+  var old=document.getElementById('share-choice'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='share-choice';
+  ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div style="width:100%;max-width:460px;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));">'
+    +'<div style="text-align:center;font-size:13px;font-weight:800;color:var(--muted);margin-bottom:12px;">共有方法を選ぶ</div>'
+    +'<button onclick="document.getElementById(\'share-choice\').remove();shareDayImage(\''+date+'\')" style="width:100%;margin-bottom:9px;padding:13px 14px;border-radius:13px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;text-align:left;">📋 一覧を画像で共有<div style="font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;">その日の全取引（茶商別）を1枚に</div></button>'
+    +'<button onclick="document.getElementById(\'share-choice\').remove();openTeawaseSheet(\''+date+'\')" style="width:100%;margin-bottom:9px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--matcha-mid);background:var(--matcha-light);color:var(--matcha);font-weight:800;font-size:14px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;text-align:left;">📄 ハラダ製茶 手合表（A4横）<div style="font-size:11px;color:var(--matcha);font-weight:500;margin-top:2px;">ハラダ製茶向けの取引のみ・印刷／PDF／共有</div></button>'
+    +'<button onclick="document.getElementById(\'share-choice\').remove()" style="width:100%;padding:12px;border-radius:13px;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">キャンセル</button>'
+  +'</div>';
+  document.body.appendChild(ov);
+}
+function openTeawaseSheet(date){
+  // ★ハラダ製茶向けの取引のみ。他茶商の取引は絶対に含めない
+  var rows=trades.filter(function(t){ return t.date===date && String(t.buyerId)===String(HARADA_BUYER_ID); });
+  if(!rows.length){ toast('この日のハラダ製茶向けの取引はありません'); return; }
+  var comps=(typeof components!=='undefined' && components && components.length)?components.slice(0,3):['窒素','繊維','タンニン'];
+  var y=date.slice(0,4),mo=parseInt(date.slice(5,7)),d=parseInt(date.slice(8,10));
+  var dstr=y+'年 '+mo+'月 '+d+'日';
+  var th='<tr><th>No</th><th>茶期</th><th>荷印（摘要）</th><th>入目×本数</th><th>数量(kg)</th><th>単価</th><th>粉引</th><th>宜協費</th><th>消費税</th><th>口銭</th><th>支払方法</th><th>品種</th><th>農薬対応</th><th>GAP/茶種</th>'+comps.map(function(c){return '<th>'+escText(c)+'</th>';}).join('')+'<th>備考</th><th>官能検査</th></tr>';
+  var body='';
+  rows.forEach(function(t,i){
+    var prod=partners.find(function(p){return String(p.id)===String(t.producerId);});
+    var marks=(t.lots||[]).map(function(l){return l.mark;}).filter(Boolean).join(' ');
+    var nigara=(prod?prod.name:'')+(marks?' '+marks:'');
+    var fee=''; try{ fee=(getFeeRate(t)*100).toFixed(2).replace(/\.?0+$/,'')+'%'; }catch(e){}
+    body+='<tr>'
+      +'<td>'+(i+1)+'</td>'
+      +'<td>'+escText(t.season||'')+'</td>'
+      +'<td class="tw-l">'+escText(nigara)+'</td>'
+      +'<td></td>'
+      +'<td class="tw-r">'+((t.totalQty!=null?t.totalQty:0).toLocaleString())+'</td>'
+      +'<td class="tw-r">'+((t.price!=null?t.price:0).toLocaleString())+'</td>'
+      +'<td class="tw-r">'+(t.kobiki!=null?t.kobiki:0)+'%</td>'
+      +'<td class="tw-r">0.18%</td>'
+      +'<td class="tw-r">8%</td>'
+      +'<td class="tw-r">'+fee+'</td>'
+      +'<td></td>'
+      +'<td class="tw-l">'+escText(t.variety||'')+'</td>'
+      +'<td></td>'
+      +'<td></td>'
+      +comps.map(function(c){ var v=(t.components&&t.components[c]!=null&&t.components[c]!=='')?t.components[c]:''; return '<td class="tw-r">'+v+'</td>'; }).join('')
+      +'<td class="tw-l">'+escText(t.memo||'')+'</td>'
+      +'<td></td>'
+    +'</tr>';
+  });
+  var totalCols=14+comps.length+2;
+  for(var e=rows.length;e<8;e++){ var tds=''; for(var c=0;c<totalCols;c++) tds+='<td>&nbsp;</td>'; body+='<tr>'+tds+'</tr>'; }
+
+  var old=document.getElementById('teawase-sheet'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.id='teawase-sheet';
+  ov.style.cssText='position:fixed;inset:0;z-index:2000;background:var(--paper);display:flex;flex-direction:column;';
+  ov.innerHTML='<style>'
+    +'#teawase-sheet .tw-table{border-collapse:collapse;width:100%;font-size:10px;color:#111;}'
+    +'#teawase-sheet .tw-table th,#teawase-sheet .tw-table td{border:1px solid #444;padding:3px 4px;text-align:center;white-space:nowrap;}'
+    +'#teawase-sheet .tw-table th{background:#eee;font-weight:700;}'
+    +'#teawase-sheet .tw-table td.tw-l{text-align:left;}#teawase-sheet .tw-table td.tw-r{text-align:right;}'
+    +'@media print{ body>*:not(#teawase-sheet){display:none!important;} #teawase-sheet{position:static!important;display:block!important;background:#fff!important;} #teawase-sheet .tw-noprint{display:none!important;} #teawase-sheet .tw-scroll{overflow:visible!important;padding:0!important;} #teawase-sheet .tw-page{box-shadow:none!important;max-width:none!important;width:100%!important;margin:0!important;} @page{size:A4 landscape;margin:8mm;} }'
+    +'</style>'
+    +'<div class="tw-noprint" style="flex:none;display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--surface);border-bottom:1px solid var(--border);">'
+      +'<button onclick="window.print()" style="padding:9px 15px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🖨 印刷 / PDF保存・共有</button>'
+      +'<button onclick="var s=document.getElementById(\'teawase-sheet\');if(s)s.remove();" style="padding:9px 14px;font-size:13px;font-weight:700;border:1px solid var(--border);border-radius:10px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button>'
+    +'</div>'
+    +'<div class="tw-scroll" style="flex:1;overflow:auto;padding:14px;">'
+      +'<div class="tw-page" style="background:#fff;max-width:1100px;margin:0 auto;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.15);">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;">'
+          +'<div style="font-size:11px;line-height:1.9;">手合日　'+dstr+'<br>納品日　'+dstr+'</div>'
+          +'<div class="serif" style="font-size:24px;font-weight:800;letter-spacing:8px;">手　合　表</div>'
+          +'<div style="font-size:11px;line-height:1.9;text-align:right;">JA大井川<br>扱者：'+escText(TEAWASE_HANDLER)+'</div>'
+        +'</div>'
+        +'<div style="font-size:10px;color:#b30000;margin-bottom:5px;font-weight:700;">※ハラダ製茶向けの取引のみ（他茶商の取引は含みません）</div>'
+        +'<table class="tw-table">'+th+body+'</table>'
+        +'<div style="margin-top:20px;font-size:11px;">サイン　＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿</div>'
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
 function openDaySummary(date){
   _daySumDate = date || localDateStr(new Date(Date.now()-86400000));  // 既定は前日
   _renderDaySummary(_daySumDate);
@@ -7343,7 +7423,7 @@ function _renderDaySummary(date){
       +'</div>'
       +'<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;">'
         +'<input type="date" value="'+date+'" onchange="if(this.value)_renderDaySummary(this.value)" style="padding:5px 9px;font-size:12px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:inherit;">'
-        +'<button onclick="shareDayImage(\''+date+'\')" style="padding:6px 13px;font-size:12px;font-weight:700;border:none;border-radius:9px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">📤 共有</button>'
+        +'<button onclick="openShareChoice(\''+date+'\')" style="padding:6px 13px;font-size:12px;font-weight:700;border:none;border-radius:9px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">📤 共有</button>'
         +'<button onclick="var s=document.getElementById(\'day-summary\');if(s)s.remove();" style="padding:6px 13px;font-size:12px;font-weight:700;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 閉じる</button>'
       +'</div>'
     +'</div>'
