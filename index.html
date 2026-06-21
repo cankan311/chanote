@@ -4820,10 +4820,19 @@ function getFeeRate(producerId, buyerId){
   return (isLowProducer && isHarada) ? FEE_RATE_LOW : FEE_RATE_HIGH;
 }
 
-// 取引1件の口銭額を返す
+// 取引1件の口銭額を返す（段階制：単価で％／円建てを切替）
+// 通常: 1000円以上1.8% / 500円以上18円 / 101円以上12円 / 100円以下5円
+// 内緒(湯日・下湯日・吹木→ハラダ): 1000円以上1.6% / 500円以上16円 / 100円以上10円(100円未満も10円扱い)
 function calcFee(t){
-  var rate = getFeeRate(t.producerId, t.buyerId);
-  return Math.round((t.totalQty||0) * t.price * rate);
+  var price = t.price||0, qty = t.totalQty||0;
+  var secret = (getFeeRate(t.producerId, t.buyerId) === FEE_RATE_LOW);
+  if(price >= 1000){
+    return Math.round(qty * price * (secret ? FEE_RATE_LOW : FEE_RATE_HIGH));
+  }
+  var perKg;
+  if(secret){ perKg = (price >= 500) ? 16 : 10; }
+  else      { perKg = (price >= 500) ? 18 : ((price >= 101) ? 12 : 5); }
+  return Math.round(qty * perKg);
 }
 
 // 複数取引の口銭合計を返す
@@ -7347,6 +7356,19 @@ function _twDefaultPay(t){
   if(_twIsTegata(p)) return 'tegata';
   return (/一番茶|一茶/.test(t.season||''))?'genkin':'noutsu';
 }
+function _twKousen(t, ed){
+  var pay=(ed&&ed.pay)||_twDefaultPay(t);
+  if(pay==='noutsu') return {pct:'', yen:''};
+  var price=(t.price!=null?t.price:0);
+  if(price>=1000) return {pct:'1.8', yen:''};
+  if(price>=500)  return {pct:'', yen:'18'};
+  if(price>=101)  return {pct:'', yen:'12'};
+  return {pct:'', yen:'5'};
+}
+function _twKouCell(t, ed){
+  var k=_twKousen(t, ed);
+  return '<div class="tw-koutei"><div class="tw-pct">'+(k.pct||'')+'％</div><div class="tw-yen">'+(k.yen||'')+'円</div></div>';
+}
 function _twPayCell(pay){
   function c(on,txt){ return on?'<span class="tw-ocir">'+txt+'</span>':txt; }
   return '<div class="tw-pay"><div class="a"><div>'+c(pay==='genkin','現')+'</div><div>・</div><div>'+c(pay==='tegata','手')+'</div></div><div class="b">'+c(pay==='noutsu','農通')+'</div></div>';
@@ -7414,8 +7436,8 @@ function _twCSS(){
     +'#teawase-sheet .tw-hin .tw-hnm{overflow:hidden;white-space:nowrap;}'
     +'#teawase-sheet .tw-hin .tw-hpc{white-space:nowrap;flex:none;}'
     +'#teawase-sheet .tw-ocir{display:inline-block;border:1.3px solid #000;border-radius:50%;padding:0 2px;line-height:1.05;}'
-    +'#teawase-sheet .tw-yago{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:-2px;}'
-    +'#teawase-sheet .tw-yago-roof{width:0.58em;height:0.58em;border-top:1.6px solid #000;border-right:1.6px solid #000;transform:rotate(-45deg);margin:0.16em 0 0.05em;}'
+    +'#teawase-sheet .tw-yago{display:inline-flex;flex-direction:column;align-items:center;line-height:0.9;vertical-align:baseline;position:relative;top:-7px;}'
+    +'#teawase-sheet .tw-yago-roof{width:0.74em;height:0.74em;border-top:1.6px solid #000;border-right:1.6px solid #000;transform:rotate(-45deg);margin:0.04em 0 -0.26em;}'
     +'#teawase-sheet .tw-yago-ch{font-size:1.05em;font-weight:600;}'
     +'#teawase-sheet .tw-pp{color:#000;}'
     +'#teawase-sheet .tw-noyaku{display:flex;flex-direction:column;height:80px;}'
@@ -7454,7 +7476,8 @@ var _TW_PAY='<div class="tw-pay"><div class="a"><div>現</div><div>・</div><div
 var _TW_NOY='<div class="tw-noyaku"><div class="g"><div>有機</div><div>無農薬</div></div><div class="g"><div>US</div><div>TP</div></div></div>';
 var _TW_GAP='<div class="tw-gapwrap"><div class="gtop"><div>SAGP　J-GAP</div><div>A-GAP　G-GAP</div></div><div class="gbot"><div>伸 中 F 冠</div><div>他（　）</div></div></div>';
 
-function _twRowHTML(t, comps, ed){
+function _twRowHTML(t, comps, ed, meta){
+  var _gikyo=(meta&&meta.gikyo!=null&&meta.gikyo!=='')?(''+meta.gikyo):'0.18'; var _tax=(meta&&meta.tax!=null&&meta.tax!=='')?(''+meta.tax):'8';
   var prod=_twProducer(t.producerId), pname=prod?prod.name:'';
   var demono=_twTradeDemono(t);
   var sym=_twSym(pname);
@@ -7473,9 +7496,9 @@ function _twRowHTML(t, comps, ed){
     +'<td class="tw-r"><div class="tw-top">'+qty.toLocaleString()+'</div></td>'
     +'<td class="tw-r"><div class="tw-top">'+price.toLocaleString()+'</div></td>'
     +'<td class="tw-c"><div class="tw-top">'+kobiki+'</div></td>'
-    +'<td class="tw-c"><div class="tw-top">0.18</div></td>'
-    +'<td class="tw-c"><div class="tw-top">8</div></td>'
-    +'<td class="tw-c">'+_TW_KOU+'</td>'
+    +'<td class="tw-c"><div class="tw-top">'+_gikyo+'</div></td>'
+    +'<td class="tw-c"><div class="tw-top">'+_tax+'</div></td>'
+    +'<td class="tw-c">'+_twKouCell(t, ed)+'</td>'
     +'<td class="tw-c">'+_twPayCell((ed&&ed.pay)||_twDefaultPay(t))+'</td>'
     +'<td class="tw-l">'+_twHinshuCell(t, ed)+'</td>'
     +'<td class="tw-c">'+_TW_NOY+'</td>'
@@ -7499,17 +7522,19 @@ var _TW_EMPTY='<tr>'
   +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
   +'</tr>';
 
-function _twPageHTML(date, rows, edits){
+function _twPageHTML(date, rows, edits, meta){
   var comps=(typeof components!=='undefined' && components && components.length)?components.slice(0,3):['窒素','繊維','タンニン'];
   var y=date.slice(0,4),mo=parseInt(date.slice(5,7),10),d=parseInt(date.slice(8,10),10);
-  var body=rows.map(function(t){return _twRowHTML(t,comps,(edits&&edits[t.id]));}).join('');
+  var dd2=(meta&&meta.delivDate)||date; var dy=dd2.slice(0,4),dmo=parseInt(dd2.slice(5,7),10),dday=parseInt(dd2.slice(8,10),10);
+  var gikyo=(meta&&meta.gikyo!=null&&meta.gikyo!=='')?(''+meta.gikyo):'0.18'; var tax=(meta&&meta.tax!=null&&meta.tax!=='')?(''+meta.tax):'8';
+  var body=rows.map(function(t){return _twRowHTML(t,comps,(edits&&edits[t.id]),meta);}).join('');
   var pad=''; for(var e=rows.length;e<6;e++){ pad+=_TW_EMPTY; }
   var tot=0; rows.forEach(function(t){ tot+=(t.totalQty!=null?t.totalQty:0); });
   var totalStr=(Math.round(tot*10)/10).toLocaleString();
   return '<div class="tw-stage"><div class="tw-page">'
     +'<div class="tw-corner">制定:2000.7.26／改訂:2020.5.4(第8版)1/1<br>作成:田辺圭太／審査:石川敦／承認:望月克則</div>'
     +'<div class="tw-hd">'
-      +'<div class="tw-date">手合日　'+y+' 年 '+mo+' 月 '+d+' 日<br>納品日　'+y+' 年 '+mo+' 月 '+d+' 日</div>'
+      +'<div class="tw-date">手合日　'+y+' 年 '+mo+' 月 '+d+' 日<br>納品日　'+dy+' 年 '+dmo+' 月 '+dday+' 日</div>'
       +'<div class="tw-title">手 合 表</div>'
       +'<div class="tw-handler">JA大井川<br>扱者：<span style="display:inline-flex;align-items:center;">'+_twYagoHTML()+'</span></div>'
     +'</div>'
@@ -7527,7 +7552,7 @@ function _twPageHTML(date, rows, edits){
 function _twOpenOverlay(pages, opts){
   opts=opts||{};
   var old=document.getElementById('teawase-sheet'); if(old) old.remove();
-  var pagesHTML=pages.map(function(p){ return _twPageHTML(opts.date, p.trades, opts.edits); }).join('');
+  var pagesHTML=pages.map(function(p){ return _twPageHTML(opts.date, p.trades, opts.edits, opts.meta); }).join('');
   var ov=document.createElement('div'); ov.id='teawase-sheet';
   ov.style.cssText='position:fixed;inset:0;z-index:2000;background:#5b5b5b;display:flex;flex-direction:column;';
   var btns='<button data-act="print" style="padding:9px 15px;font-size:13px;font-weight:800;border:none;border-radius:10px;background:var(--matcha);color:#fff;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">🖨 印刷 / PDF・共有</button>';
@@ -7633,7 +7658,7 @@ function openTeawaseAssign(date, recId){
 }
 
 /* ===== 手合帳タブ ビュー ===== */
-function twOpenRecord(id){ var r=_twRecGet(id); if(!r) return; _twOpenOverlay(_twPagesFor(r.date, r.groups), {mode:(r.status==='done'?'done':'draft'), recId:id, date:r.date, edits:r.edits}); }
+function twOpenRecord(id){ var r=_twRecGet(id); if(!r) return; _twOpenOverlay(_twPagesFor(r.date, r.groups), {mode:(r.status==='done'?'done':'draft'), recId:id, date:r.date, edits:r.edits, meta:{delivDate:r.delivDate, gikyo:r.gikyo, tax:r.tax}}); }
 function twDeleteRecord(id){ if(!window.confirm('この手合帳を削除しますか？')) return; _twRecDelete(id); showCalTab('teai'); }
 
 function _twRecSummary(r){
@@ -7698,10 +7723,17 @@ function twEditRecord(id){
   ov.style.cssText='position:fixed;inset:0;z-index:2060;background:var(--surface);display:flex;flex-direction:column;';
   var vlist=(typeof varieties!=='undefined'&&varieties)?varieties:[];
   var dataOpts=vlist.map(function(v){return '<option value="'+_twEsc(v)+'">';}).join('');
+  var setIn='padding:8px 9px;font-size:13px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;';
+  var setLbl='display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:var(--muted);';
   ov.innerHTML='<datalist id="tw-vlist">'+dataOpts+'</datalist>'
     +'<div style="flex:none;display:flex;align-items:center;gap:8px;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--paper);border-bottom:1px solid var(--border);">'
       +'<div style="font-weight:800;font-size:15px;color:var(--ink);">項目の編集 <span style="font-size:12px;color:var(--muted);font-weight:600;">'+_twEsc(rec.date)+'</span></div>'
       +'<button data-act="cancel" style="padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--muted);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">閉じる</button>'
+    +'</div>'
+    +'<div style="flex:none;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:10px 14px;background:var(--paper);border-bottom:1px solid var(--border);">'
+      +'<label style="'+setLbl+'">納品日<input id="tw-deliv" type="date" value="'+_twEsc(rec.delivDate||rec.date)+'" style="'+setIn+'"></label>'
+      +'<label style="'+setLbl+'">宜協費<input id="tw-gikyo" type="number" inputmode="decimal" step="0.01" value="'+_twEsc(rec.gikyo!=null?(''+rec.gikyo):'0.18')+'" style="width:80px;text-align:right;'+setIn+'"></label>'
+      +'<label style="'+setLbl+'">消費税<input id="tw-tax" type="number" inputmode="numeric" step="1" value="'+_twEsc(rec.tax!=null?(''+rec.tax):'8')+'" style="width:70px;text-align:right;'+setIn+'"></label>'
     +'</div>'
     +'<div id="tw-edit-body" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;"></div>'
     +'<div style="flex:none;display:flex;gap:8px;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--border);">'
@@ -7711,6 +7743,12 @@ function twEditRecord(id){
   document.body.appendChild(ov);
   var body=ov.querySelector('#tw-edit-body');
   function numOrBlank(x){ return x===''?'':parseFloat(x); }
+  function kouLabel(tid){
+    var t=byId[tid], pay=state[tid].pay;
+    if(pay==='noutsu') return '口銭：なし（農通）';
+    var k=_twKousen(t,{pay:pay});
+    return '口銭：'+(k.pct?k.pct+'％':(k.yen?k.yen+'円':'—'))+'（自動）';
+  }
   var inStyle='padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;';
   var delStyle='flex:none;width:34px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:#c44;font-size:14px;cursor:pointer;';
   var segOff='padding:7px 11px;margin:0 6px 6px 0;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;';
@@ -7766,6 +7804,7 @@ function twEditRecord(id){
         +'<div class="tw-ichk" style="font-size:12px;font-weight:700;color:var(--muted);"></div>'
       +'</div>'
       +'<div style="'+lbl+'">支払方法</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+payH+'</div>'
+      +'<div class="tw-kouinfo" data-tid="'+t.id+'" style="font-size:11px;font-weight:700;color:var(--muted);margin:2px 0 4px;"></div>'
       +'<div style="'+lbl+'">GAP（複数選択可）</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+gapH+'</div>'
       +'<div style="'+lbl+'">茶種</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+csH+'</div>'
     +'</div>';
@@ -7792,6 +7831,7 @@ function twEditRecord(id){
     el.textContent='= '+r+'kg'+(qty!=null?'（数量 '+qty+'）':'');
     el.style.color=(qty!=null&&Math.abs(r-qty)<0.5)?'var(--matcha)':'#c44';
   }
+  function kouOf(tid){ var ki=body.querySelector('.tw-kouinfo[data-tid="'+tid+'"]'); if(ki)ki.textContent=kouLabel(tid); }
   function bind(){
     body.querySelectorAll('.tw-vn,.tw-vp').forEach(function(inp){ inp.addEventListener('input',function(){ var tid=inp.closest('.tw-vrow').getAttribute('data-tid'); readCard(tid); sumOf(tid); }); });
     body.querySelectorAll('.tw-ime-me,.tw-ime-hon').forEach(function(inp){ inp.addEventListener('input',function(){ var tid=inp.closest('.tw-irow').getAttribute('data-tid'); readCard(tid); checkOf(tid); }); });
@@ -7806,6 +7846,7 @@ function twEditRecord(id){
         var on=((x.getAttribute('data-val')||'')===(state[tid][field]==null?'':state[tid][field]));
         x.setAttribute('style', on?segOn:segOff);
       });
+      if(field==='pay') kouOf(tid);
     }); });
     body.querySelectorAll('.tw-segm').forEach(function(b){ b.addEventListener('click',function(){
       var tid=b.getAttribute('data-tid'), field=b.getAttribute('data-field'), val=b.getAttribute('data-val');
@@ -7813,10 +7854,13 @@ function twEditRecord(id){
       b.setAttribute('style', (arr.indexOf(val)>=0)?segOn:segOff);
     }); });
   }
-  function render(){ body.innerHTML=day.map(cardHTML).join(''); bind(); day.forEach(function(t){ sumOf(t.id); checkOf(t.id); }); }
+  function render(){ body.innerHTML=day.map(cardHTML).join(''); bind(); day.forEach(function(t){ sumOf(t.id); checkOf(t.id); kouOf(t.id); }); }
   render();
 
   function persist(){
+    rec.delivDate=(document.getElementById('tw-deliv').value)||rec.date;
+    var gv=document.getElementById('tw-gikyo').value; rec.gikyo=(gv===''?0.18:parseFloat(gv));
+    var tv=document.getElementById('tw-tax').value; rec.tax=(tv===''?8:parseFloat(tv));
     var vm=_twVMeta(), gm=_twGMeta();
     day.forEach(function(t){
       readCard(t.id);
@@ -7835,7 +7879,7 @@ function twEditRecord(id){
       var a=b.getAttribute('data-act');
       if(a==='cancel'){ ov.remove(); return; }
       if(a==='save'){ persist(); ov.remove(); if(typeof toast==='function')toast('保存しました'); showCalTab('teai'); return; }
-      if(a==='preview'){ persist(); _twOpenOverlay(_twPagesFor(rec.date, rec.groups), {mode:'draft', recId:rec.id, date:rec.date, edits:rec.edits}); return; }
+      if(a==='preview'){ persist(); _twOpenOverlay(_twPagesFor(rec.date, rec.groups), {mode:'draft', recId:rec.id, date:rec.date, edits:rec.edits, meta:{delivDate:rec.delivDate, gikyo:rec.gikyo, tax:rec.tax}}); return; }
     });
   });
 }
