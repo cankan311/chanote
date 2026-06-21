@@ -7302,6 +7302,9 @@ function _twGroupOf(t, groups){
 }
 function _twVMeta(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_vmeta_v1')||'{}'); }catch(e){ return {}; } }
 function _twVMetaSave(m){ try{ _safeLS.setItem('ocha_teaicho_vmeta_v1', JSON.stringify(m)); }catch(e){} }
+function _twGMeta(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_gmeta_v1')||'{}'); }catch(e){ return {}; } }
+function _twGMetaSave(m){ try{ _safeLS.setItem('ocha_teaicho_gmeta_v1', JSON.stringify(m)); }catch(e){} }
+function _twInitGap(t, ed){ if(ed && ed.gap){ return Array.isArray(ed.gap)?ed.gap.slice():[ed.gap]; } var gm=_twGMeta(), g=gm[t.producerId]; if(g && g.length) return g.slice(); return []; }
 function _twInitHinshu(t, ed){
   if(ed && ed.hinshu && ed.hinshu.length) return ed.hinshu.map(function(v){return {name:v.name, pct:v.pct};});
   var vm=_twVMeta(), names=vm[t.producerId];
@@ -7311,7 +7314,9 @@ function _twInitHinshu(t, ed){
 }
 function _twHinshuCell(t, ed){
   var list=_twInitHinshu(t, ed), n=list.length;
+  var maxlen=0; list.forEach(function(v){ var L=(v.name||'').length; if(L>maxlen)maxlen=L; });
   var fs=n<=4?13:(n===5?11:(n===6?10:(n===7?9:8)));
+  if(maxlen>=6) fs=Math.min(fs,10); else if(maxlen>=5) fs=Math.min(fs,11);
   var lh=n<=4?1.45:1.18;
   var rows=list.map(function(v){
     var pct=(v.pct===''||v.pct==null)?'':(''+v.pct);
@@ -7334,6 +7339,23 @@ function _twIrumeCell(ed){
     +'<div class="tw-ime-x">×</div>'
     +'<div class="tw-ime-r" style="justify-content:'+just+';">'+R+'</div>'
   +'</div>';
+}
+function _twYagoHTML(){ return '<span class="tw-yago"><span class="tw-yago-roof"></span><span class="tw-yago-ch">叶</span></span>'; }
+function _twDefaultPay(t){
+  var p=_twProducer(t.producerId);
+  if(_twIsKitahai(p)) return 'noutsu';
+  if(_twIsTegata(p)) return 'tegata';
+  return (/一番茶|一茶/.test(t.season||''))?'genkin':'noutsu';
+}
+function _twPayCell(pay){
+  function c(on,txt){ return on?'<span class="tw-ocir">'+txt+'</span>':txt; }
+  return '<div class="tw-pay"><div class="a"><div>'+c(pay==='genkin','現')+'</div><div>・</div><div>'+c(pay==='tegata','手')+'</div></div><div class="b">'+c(pay==='noutsu','農通')+'</div></div>';
+}
+function _twGapCell(ed){
+  var arr=(ed&&ed.gap)?(Array.isArray(ed.gap)?ed.gap:[ed.gap]):[]; var cs=ed&&ed.chashu;
+  function inA(x){ return arr.indexOf(x)>=0; }
+  function c(on,txt){ return on?'<span class="tw-ocir">'+txt+'</span>':txt; }
+  return '<div class="tw-gapwrap"><div class="gtop"><div>'+c(inA('SAGP'),'SAGP')+'　'+c(inA('JGAP'),'J-GAP')+'</div><div>'+c(inA('AGAP'),'A-GAP')+'　'+c(inA('GGAP'),'G-GAP')+'</div></div><div class="gbot"><div>'+c(cs==='伸','伸')+' '+c(cs==='中','中')+' '+c(cs==='F','F')+' '+c(cs==='冠','冠')+'</div><div>'+c(cs==='他','他')+'（　）</div></div></div>';
 }
 function _twRecs(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_v1')||'[]'); }catch(e){ return []; } }
 function _twRecsSave(a){ try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }catch(e){} }
@@ -7389,8 +7411,12 @@ function _twCSS(){
     +'#teawase-sheet .tw-pay .b{font-size:12px;text-align:center;border-top:1px solid #000;padding:2px 0 5px;}'
     +'#teawase-sheet .tw-hin{padding:6px 5px 0;font-size:13px;line-height:1.45;text-align:left;height:80px;overflow:hidden;}'
     +'#teawase-sheet .tw-hin .tw-hrow{display:flex;justify-content:space-between;align-items:baseline;gap:4px;}'
-    +'#teawase-sheet .tw-hin .tw-hnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+    +'#teawase-sheet .tw-hin .tw-hnm{overflow:hidden;white-space:nowrap;}'
     +'#teawase-sheet .tw-hin .tw-hpc{white-space:nowrap;flex:none;}'
+    +'#teawase-sheet .tw-ocir{display:inline-block;border:1.3px solid #000;border-radius:50%;padding:0 2px;line-height:1.05;}'
+    +'#teawase-sheet .tw-yago{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:-2px;}'
+    +'#teawase-sheet .tw-yago-roof{width:0.58em;height:0.58em;border-top:1.6px solid #000;border-right:1.6px solid #000;transform:rotate(-45deg);margin:0.16em 0 0.05em;}'
+    +'#teawase-sheet .tw-yago-ch{font-size:1.05em;font-weight:600;}'
     +'#teawase-sheet .tw-pp{color:#000;}'
     +'#teawase-sheet .tw-noyaku{display:flex;flex-direction:column;height:80px;}'
     +'#teawase-sheet .tw-noyaku .g{flex:1;display:flex;flex-direction:column;justify-content:space-around;font-size:11px;line-height:1.0;}'
@@ -7403,7 +7429,8 @@ function _twCSS(){
     +'#teawase-sheet .tw-stamp{height:80px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#bbb;}'
     +'#teawase-sheet .tw-ft{display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto;padding-top:10px;flex:none;}'
     +'#teawase-sheet .tw-total{font-size:19px;font-weight:700;white-space:nowrap;}'
-    +'#teawase-sheet .tw-sign{flex:1;text-align:center;font-size:15px;padding:0 18px;white-space:nowrap;}'
+    +'#teawase-sheet .tw-spacer{flex:1;}'
+    +'#teawase-sheet .tw-sign{flex:none;text-align:right;font-size:15px;padding:0 14px 0 0;white-space:nowrap;}'
     +'#teawase-sheet .tw-sline{display:inline-block;width:300px;border-bottom:1px solid #000;height:1px;vertical-align:middle;margin-left:6px;}'
     +'#teawase-sheet .tw-chk{border-collapse:collapse;}'
     +'#teawase-sheet .tw-chk td{border:1px solid #000;font-size:13px;width:78px;text-align:center;padding:4px;}'
@@ -7449,10 +7476,10 @@ function _twRowHTML(t, comps, ed){
     +'<td class="tw-c"><div class="tw-top">0.18</div></td>'
     +'<td class="tw-c"><div class="tw-top">8</div></td>'
     +'<td class="tw-c">'+_TW_KOU+'</td>'
-    +'<td class="tw-c">'+_TW_PAY+'</td>'
+    +'<td class="tw-c">'+_twPayCell((ed&&ed.pay)||_twDefaultPay(t))+'</td>'
     +'<td class="tw-l">'+_twHinshuCell(t, ed)+'</td>'
     +'<td class="tw-c">'+_TW_NOY+'</td>'
-    +'<td class="tw-c">'+_TW_GAP+'</td>'
+    +'<td class="tw-c">'+_twGapCell(ed)+'</td>'
     +'<td class="tw-r"><div class="tw-cmp"><div>'+cv(comps[0])+'</div><div>'+cv(comps[1])+'</div><div>'+cv(comps[2])+'</div></div></td>'
     +'<td class="tw-l"><div class="tw-top tw-memo">'+memo+'</div></td>'
     +'<td class="tw-c"><div class="tw-stamp">印</div></td>'
@@ -7484,11 +7511,12 @@ function _twPageHTML(date, rows, edits){
     +'<div class="tw-hd">'
       +'<div class="tw-date">手合日　'+y+' 年 '+mo+' 月 '+d+' 日<br>納品日　'+y+' 年 '+mo+' 月 '+d+' 日</div>'
       +'<div class="tw-title">手 合 表</div>'
-      +'<div class="tw-handler">JA大井川<br>扱者：'+_twEsc(TEAWASE_HANDLER)+'</div>'
+      +'<div class="tw-handler">JA大井川<br>扱者：<span style="display:inline-flex;align-items:center;">'+_twYagoHTML()+'</span></div>'
     +'</div>'
     +'<table class="tw">'+_twHead()+body+pad+'</table>'
     +'<div class="tw-ft">'
       +'<div class="tw-total">計 '+totalStr+'kg</div>'
+      +'<div class="tw-spacer"></div>'
       +'<div class="tw-sign">サイン<span class="tw-sline"></span></div>'
       +'<table class="tw-chk"><tr><td>入荷検査</td><td>事務入力</td></tr><tr><td>印</td><td>印</td></tr></table>'
     +'</div>'
@@ -7663,7 +7691,7 @@ function twEditRecord(id){
   if(!day.length){ if(typeof toast==='function')toast('取引がありません'); return; }
   rec.edits=rec.edits||{};
   var byId={}, state={};
-  day.forEach(function(t){ byId[t.id]=t; state[t.id]={ hinshu:_twInitHinshu(t, rec.edits[t.id]), irume:_twInitIrume(t, rec.edits[t.id]) }; });
+  day.forEach(function(t){ var ed=rec.edits[t.id]||{}; byId[t.id]=t; state[t.id]={ hinshu:_twInitHinshu(t, ed), irume:_twInitIrume(t, ed), pay:(ed.pay||_twDefaultPay(t)), gap:_twInitGap(t, ed), chashu:(ed.chashu||null) }; });
 
   var old=document.getElementById('tw-edit'); if(old) old.remove();
   var ov=document.createElement('div'); ov.id='tw-edit';
@@ -7685,7 +7713,18 @@ function twEditRecord(id){
   function numOrBlank(x){ return x===''?'':parseFloat(x); }
   var inStyle='padding:9px 10px;font-size:14px;border:1px solid var(--border);border-radius:9px;background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;';
   var delStyle='flex:none;width:34px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:#c44;font-size:14px;cursor:pointer;';
+  var segOff='padding:7px 11px;margin:0 6px 6px 0;border-radius:9px;border:1px solid var(--border);background:var(--paper);color:var(--ink);font-weight:700;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;';
+  var segOn ='padding:7px 11px;margin:0 6px 6px 0;border-radius:9px;border:1px solid var(--matcha);background:var(--matcha);color:#fff;font-weight:800;font-size:13px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;';
+  var lbl='font-size:11px;font-weight:800;color:var(--muted);margin:12px 0 6px;';
 
+  function seg(tid, field, val, label, cur){
+    var on=((val==null?'':val)===(cur==null?'':cur));
+    return '<button class="tw-seg" data-tid="'+tid+'" data-field="'+field+'" data-val="'+(val==null?'':val)+'" style="'+(on?segOn:segOff)+'">'+label+'</button>';
+  }
+  function segm(tid, field, val, label, arr){
+    var on=(arr.indexOf(val)>=0);
+    return '<button class="tw-segm" data-tid="'+tid+'" data-field="'+field+'" data-val="'+val+'" style="'+(on?segOn:segOff)+'">'+label+'</button>';
+  }
   function vrow(tid, idx){
     var v=state[tid].hinshu[idx];
     return '<div class="tw-vrow" data-tid="'+tid+'" data-idx="'+idx+'" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
@@ -7707,23 +7746,28 @@ function twEditRecord(id){
     var p=_twProducer(t.producerId), nm=p?p.name:'(不明)';
     var demo=_twTradeDemono(t), season=_twSeason(t.season);
     var mark=((t.lots||[]).map(function(l){return l.mark;}).filter(Boolean)[0])||'';
-    var vH=state[t.id].hinshu.map(function(_x,i){return vrow(t.id,i);}).join('');
-    var iH=state[t.id].irume.map(function(_x,i){return irow(t.id,i);}).join('');
+    var st=state[t.id];
+    var vH=st.hinshu.map(function(_x,i){return vrow(t.id,i);}).join('');
+    var iH=st.irume.map(function(_x,i){return irow(t.id,i);}).join('');
+    var payH=seg(t.id,'pay','genkin','現金',st.pay)+seg(t.id,'pay','tegata','手形',st.pay)+seg(t.id,'pay','noutsu','農通',st.pay);
+    var gapH=segm(t.id,'gap','SAGP','SAGP',st.gap)+segm(t.id,'gap','JGAP','J-GAP',st.gap)+segm(t.id,'gap','AGAP','A-GAP',st.gap)+segm(t.id,'gap','GGAP','G-GAP',st.gap);
+    var csH=['伸','中','F','冠','他'].map(function(x){return seg(t.id,'chashu',x,x,st.chashu);}).join('')+seg(t.id,'chashu','','なし',st.chashu);
     return '<div class="tw-ecard" data-tid="'+t.id+'" style="background:var(--paper);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:12px;">'
       +'<div style="font-weight:800;font-size:14px;color:var(--ink);margin-bottom:1px;">'+_twEsc(nm)+(demo?' <span style="color:#c70;">出物</span>':'')+'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">'+_twEsc(season)+(mark?'／'+_twEsc(mark):'')+'</div>'
-      +'<div style="font-size:11px;font-weight:800;color:var(--muted);margin:2px 0 6px;">品種</div>'
-      +'<div class="tw-vrows">'+vH+'</div>'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 12px;">'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">'+_twEsc(season)+(mark?'／'+_twEsc(mark):'')+'</div>'
+      +'<div style="'+lbl+'margin-top:2px;">品種</div><div class="tw-vrows">'+vH+'</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin:2px 0 4px;">'
         +'<button class="tw-vadd" style="padding:6px 11px;border-radius:9px;border:1px dashed var(--border);background:transparent;color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">＋ 品種</button>'
         +'<div class="tw-vsum" style="font-size:12px;font-weight:700;color:var(--muted);"></div>'
       +'</div>'
-      +'<div style="font-size:11px;font-weight:800;color:var(--muted);margin:2px 0 6px;">入目 × 本数</div>'
-      +'<div class="tw-irows">'+iH+'</div>'
+      +'<div style="'+lbl+'">入目 × 本数</div><div class="tw-irows">'+iH+'</div>'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">'
         +'<button class="tw-iadd" style="padding:6px 11px;border-radius:9px;border:1px dashed var(--border);background:transparent;color:var(--matcha);font-weight:700;font-size:12px;font-family:\'Noto Sans JP\',sans-serif;cursor:pointer;">＋ 段（最大3）</button>'
         +'<div class="tw-ichk" style="font-size:12px;font-weight:700;color:var(--muted);"></div>'
       +'</div>'
+      +'<div style="'+lbl+'">支払方法</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+payH+'</div>'
+      +'<div style="'+lbl+'">GAP（複数選択可）</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+gapH+'</div>'
+      +'<div style="'+lbl+'">茶種</div><div class="tw-segrow" style="display:flex;flex-wrap:wrap;">'+csH+'</div>'
     +'</div>';
   }
   function readCard(tid){
@@ -7755,23 +7799,36 @@ function twEditRecord(id){
     body.querySelectorAll('.tw-idel').forEach(function(b){ b.addEventListener('click',function(){ var row=b.closest('.tw-irow'), tid=row.getAttribute('data-tid'); readCard(tid); state[tid].irume.splice(parseInt(row.getAttribute('data-idx'),10),1); if(!state[tid].irume.length) state[tid].irume=[{me:'',hon:''}]; render(); }); });
     body.querySelectorAll('.tw-vadd').forEach(function(b){ b.addEventListener('click',function(){ var tid=b.closest('.tw-ecard').getAttribute('data-tid'); readCard(tid); state[tid].hinshu.push({name:'',pct:''}); render(); }); });
     body.querySelectorAll('.tw-iadd').forEach(function(b){ b.addEventListener('click',function(){ var tid=b.closest('.tw-ecard').getAttribute('data-tid'); readCard(tid); if(state[tid].irume.length<3) state[tid].irume.push({me:'',hon:''}); render(); }); });
+    body.querySelectorAll('.tw-seg').forEach(function(b){ b.addEventListener('click',function(){
+      var tid=b.getAttribute('data-tid'), field=b.getAttribute('data-field'), val=b.getAttribute('data-val');
+      state[tid][field]=(val===''?null:val);
+      body.querySelectorAll('.tw-seg[data-tid="'+tid+'"][data-field="'+field+'"]').forEach(function(x){
+        var on=((x.getAttribute('data-val')||'')===(state[tid][field]==null?'':state[tid][field]));
+        x.setAttribute('style', on?segOn:segOff);
+      });
+    }); });
+    body.querySelectorAll('.tw-segm').forEach(function(b){ b.addEventListener('click',function(){
+      var tid=b.getAttribute('data-tid'), field=b.getAttribute('data-field'), val=b.getAttribute('data-val');
+      var arr=state[tid][field]; var i=arr.indexOf(val); if(i>=0)arr.splice(i,1); else arr.push(val);
+      b.setAttribute('style', (arr.indexOf(val)>=0)?segOn:segOff);
+    }); });
   }
   function render(){ body.innerHTML=day.map(cardHTML).join(''); bind(); day.forEach(function(t){ sumOf(t.id); checkOf(t.id); }); }
   render();
 
   function persist(){
-    var vm=_twVMeta();
+    var vm=_twVMeta(), gm=_twGMeta();
     day.forEach(function(t){
       readCard(t.id);
       var hs=state[t.id].hinshu.filter(function(v){return (v.name||'').trim()!=='';});
       var im=state[t.id].irume.filter(function(v){return (v.me!==''&&v.me!=null)||(v.hon!==''&&v.hon!=null);});
-      rec.edits[t.id]=rec.edits[t.id]||{};
-      rec.edits[t.id].hinshu=hs;
-      rec.edits[t.id].irume=im;
+      var ed=rec.edits[t.id]=rec.edits[t.id]||{};
+      ed.hinshu=hs; ed.irume=im; ed.pay=state[t.id].pay||null; ed.gap=(state[t.id].gap||[]).slice(); ed.chashu=state[t.id].chashu||null;
       var names=hs.map(function(v){return v.name;});
       if(names.length) vm[t.producerId]=names;
+      if(ed.gap.length) gm[t.producerId]=ed.gap.slice();
     });
-    _twVMetaSave(vm); _twRecUpsert(rec);
+    _twVMetaSave(vm); _twGMetaSave(gm); _twRecUpsert(rec);
   }
   ov.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){
