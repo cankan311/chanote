@@ -7714,13 +7714,20 @@ function _twExcelChoose(blob, fname, date){
     if(typeof toast==='function')toast('ダウンロードしました');
   }
   function doShare(){
-    var file; try{ file=new File([blob],fname,{type:blob.type}); }catch(e){ doDownload(); return; }
+    var file;
+    try{ file=new File([blob],fname,{type:blob.type}); }
+    catch(e){ if(typeof toast==='function')toast('この端末は共有に対応していません。ダウンロードを使ってください'); return; }
     if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
       navigator.share({files:[file],title:'手合表 '+date}).then(function(){
         if(typeof toast==='function')toast('共有しました');
-      }).catch(function(){ /* キャンセル等は何もしない */ });
+      }).catch(function(err){
+        // ユーザーがキャンセルした場合は何もしない。それ以外の失敗だけ案内する。
+        if(err && err.name && err.name!=='AbortError'){
+          if(typeof toast==='function')toast('共有できませんでした。ダウンロードを使ってください');
+        }
+      });
     } else {
-      doDownload();
+      if(typeof toast==='function')toast('この端末は共有に対応していません。ダウンロードを使ってください');
     }
   }
   var ov=document.createElement('div');
