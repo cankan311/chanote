@@ -1439,18 +1439,46 @@ function _applyData(data){
   _saveToLocalStorage();
 }
 
+function _lsSetVerify(k,v){
+  try{
+    _safeLS.setItem(k, v);
+    return _safeLS.getItem(k) === v;
+  }catch(e){
+    console.error('localStorage save failed:', k, e);
+    return false;
+  }
+}
+function _saveCriticalLocalStorage(){
+  var ok=true;
+  ok = _lsSetVerify('ocha_partners',JSON.stringify(partners)) && ok;
+  ok = _lsSetVerify('ocha_trades4',JSON.stringify(trades)) && ok;
+  ok = _lsSetVerify('ocha_components',JSON.stringify(components)) && ok;
+  ok = _lsSetVerify('ocha_varieties',JSON.stringify(varieties)) && ok;
+  ok = _lsSetVerify('ocha_season_defs',JSON.stringify(seasonDefs)) && ok;
+  ok = _lsSetVerify('ocha_rest_days',JSON.stringify(restDays)) && ok;
+  ok = _lsSetVerify('ocha_orders',JSON.stringify(orders)) && ok;
+  if(analyzeOrder) ok = _lsSetVerify('ocha_analyze_order',JSON.stringify(analyzeOrder)) && ok;
+  return ok;
+}
+function _freeOptionalStorageForCriticalSave(){
+  try{ _safeLS.removeItem('ocha_teai_images'); }catch(e){}
+  try{ _safeLS.removeItem('ocha_activity_log'); }catch(e){}
+  try{ _safeLS.setItem('ocha_storage_rescue_at', new Date().toISOString()); }catch(e){}
+}
 function _saveToLocalStorage(){
-  function _set(k,v){ try{ _safeLS.setItem(k, v); return true; }catch(e){ return false; } }
-  _set('ocha_partners',JSON.stringify(partners));
-  _set('ocha_trades4',JSON.stringify(trades));
-  _set('ocha_components',JSON.stringify(components));
-  _set('ocha_varieties',JSON.stringify(varieties));
-  // 手合わせ帳は最後に独立保存（容量超過しても他データを巻き込まない）
-  _set('ocha_season_defs',JSON.stringify(seasonDefs));
-  _set('ocha_rest_days',JSON.stringify(restDays));
-  _set('ocha_orders',JSON.stringify(orders));
-  if(analyzeOrder) _set('ocha_analyze_order',JSON.stringify(analyzeOrder));
-  _set('ocha_teai_images',JSON.stringify(teaiImages));
+  // 取引記録を最優先で保存する。写真等の大きいデータで容量を食っても、取引記録を消さない。
+  var ok=_saveCriticalLocalStorage();
+  if(!ok){
+    _freeOptionalStorageForCriticalSave();
+    ok=_saveCriticalLocalStorage();
+  }
+  // 写真キャッシュは大きくなりやすいので、通常保存では無理に上書きしない。
+  // ここで失敗しても取引記録保存は失敗扱いにしない。
+  try{
+    var imgJson=JSON.stringify(teaiImages||{});
+    if(imgJson.length < 1200000){ _safeLS.setItem('ocha_teai_images', imgJson); }
+  }catch(e){ console.warn('teai image cache skipped', e); }
+  return ok;
 }
 
 var _unsaved = false;
@@ -1554,6 +1582,11 @@ function loadFromFile(input){
 }
 
 function _finishLoad(){
+  try{
+    if(_safeLS.getItem('ocha_storage_rescue_at') && typeof toast==='function'){
+      setTimeout(function(){ toast('保存容量を確保するため写真キャッシュを一部外しました'); },600);
+    }
+  }catch(e){}
   setTimeout(function(){ try{renderHome();}catch(e){} },0);
   // teaiImagesはlocalStorageから読み込む（HTMLには焼き込まない）
   try{
@@ -1573,9 +1606,14 @@ function _finishLoad(){
 }
 
 function save(){
-  _saveToLocalStorage();
+  var ok=_saveToLocalStorage();
+  if(!ok){
+    alert('保存できませんでした。ブラウザの保存容量が足りない可能性があります。\n写真キャッシュ等を外して再保存を試しましたが、取引記録を永続保存できませんでした。\n設定画面からバックアップを保存してから、不要な写真/他アプリの保存データを減らしてください。');
+    return false;
+  }
   _markUnsaved();
   try{ if(document.getElementById('screen-home').classList.contains('active')) renderHome(); }catch(e){}
+  return true;
 }
 
 function renderAll(){
@@ -3290,8 +3328,12 @@ function saveTrade(){
     if(el&&el.value!=='') comps[c]=parseFloat(el.value);
   });
   var kobikiPct=getKobikiPct();
-  trades.push({id:Date.now(),date:document.getElementById('t-date').value,season:seasonForDate(document.getElementById('t-date').value),producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,demono:!!(document.getElementById('t-demono')&&document.getElementById('t-demono').checked),memo:document.getElementById('t-memo').value.trim()});
-  save();
+  var newTrade={id:Date.now(),date:document.getElementById('t-date').value,season:seasonForDate(document.getElementById('t-date').value),producerId:producerId,buyerId:buyerId,variety:document.getElementById('t-variety').value,price:price,kobiki:kobikiPct,lots:lots,totalQty:totalQty,components:comps,demono:!!(document.getElementById('t-demono')&&document.getElementById('t-demono').checked),memo:document.getElementById('t-memo').value.trim()};
+  trades.push(newTrade);
+  if(!save()){
+    trades=trades.filter(function(t){return t.id!==newTrade.id;});
+    return;
+  }
   document.getElementById('t-price').value='';
   document.getElementById('t-variety').value='';
   document.getElementById('t-memo').value='';
@@ -6132,7 +6174,7 @@ function renderCompChart(){
   var labels=dates.map(function(d){return d.slice(5).replace('-','/');});
   // 生産家ごとに系列化（茶農協はdocCanonNameでまとめる）
   function _pp(t){ return partners.find(function(x){return x.id===t.producerId;}); }
-  function gname(t){ var p=_pp(t); if(!p) return '—'; return (typeof docCanonName==='function')?docCanonName(p.name):p.name; }
+  function gname(t){ var p=_pp(t); if(!p) return '—'; return (typeof analyzeGraphProducerName==='function')?analyzeGraphProducerName(p.name):((typeof docCanonName==='function')?docCanonName(p.name):p.name); }
   var groups={};
   ft=ft.filter(function(t){ var p=_pp(t); return p && p.type==='producer'; }); // 生産家が売り手の取引だけ（茶商間取引を除外）
   ft.forEach(function(t){ var g=gname(t); if(!groups[g]) groups[g]={}; 
@@ -7460,9 +7502,17 @@ function _twGapCell(ed){
   return '<div class="tw-gapwrap"><div class="gtop"><div>'+c(inA('SAGP'),'SAGP')+'　'+c(inA('JGAP'),'J-GAP')+'</div><div>'+c(inA('AGAP'),'A-GAP')+'　'+c(inA('GGAP'),'G-GAP')+'</div></div><div class="gbot"><div>'+c(cs==='伸','伸')+' '+c(cs==='中','中')+' '+c(cs==='F','F')+' '+c(cs==='冠','冠')+'</div><div>'+c(cs==='他','他')+'（　）</div></div></div>';
 }
 function _twRecs(){ try{ return JSON.parse(_safeLS.getItem('ocha_teaicho_v1')||'[]'); }catch(e){ return []; } }
-function _twRecsSave(a){ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }
-function _twRecGet(id){ return _twRecs().filter(function(r){return r.id===id;})[0]; }
-function _twRecUpsert(rec){ var a=_twRecs(); var i=-1; a.forEach(function(r,k){ if(r.id===rec.id) i=k; }); rec.updatedAt=Date.now(); if(i>=0)a[i]=rec; else a.push(rec); _twRecsSave(a); }
+function _twRecsSave(a){ try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); return true; }catch(e){ console.error(e); return false; } }
+function _twRecGet(id){ return _twRecs().filter(function(r){return String(r.id)===String(id);})[0]; }
+function _twRecUpsert(rec){
+  var a=_twRecs(), i=-1;
+  a.forEach(function(r,k){ if(String(r.id)===String(rec.id)) i=k; });
+  rec.updatedAt=Date.now();
+  if(i>=0) a[i]=rec; else a.push(rec);
+  try{ _safeLS.setItem('ocha_teaicho_v1', JSON.stringify(a)); }
+  catch(e){ console.error(e); return false; }
+  return true;
+}
 function _twRecDelete(id){ _twRecsSave(_twRecs().filter(function(r){return r.id!==id;})); }
 
 function _twHaradaTrades(date){ return trades.filter(function(t){ return t.date===date && String(t.buyerId)===String(HARADA_BUYER_ID); }); }
@@ -8149,7 +8199,9 @@ function twEditRecord(id){
       if(names.length) vm[t.producerId]=names;
       if(ed.gap.length) gm[t.producerId]=ed.gap.slice();
     });
-    _twVMetaSave(vm); _twGMetaSave(gm); _twRecUpsert(rec);
+    try{ _twVMetaSave(vm); }catch(e){ console.warn('variety meta save failed', e); }
+    try{ _twGMetaSave(gm); }catch(e){ console.warn('gap meta save failed', e); }
+    if(!_twRecUpsert(rec)){ throw new Error('teaicho save failed'); }
   }
   ov.querySelectorAll('[data-act]').forEach(function(b){
     b.addEventListener('click',function(){
@@ -8158,14 +8210,16 @@ function twEditRecord(id){
       if(a==='save'){
         try{
           persist();
-          var saved=_twRecGet(rec.id);
-          if(!saved){ throw new Error('save failed'); }
           ov.remove();
           if(typeof toast==='function')toast('保存しました');
           try{ renderCalendar(); }catch(_e){}
           try{ renderHome(); }catch(_e){}
-          showCalTab('teai');
-        }catch(e){ console.error(e); if(typeof toast==='function')toast('保存に失敗しました。もう一度押してください'); }
+          try{ renderCalTeai(); }catch(_e){}
+          try{ showCalTab('teai'); }catch(_e){}
+        }catch(e){
+          console.error(e);
+          alert('保存できませんでした。ブラウザ保存に失敗しています。いったんバックアップを保存してから、ページ再読み込み後にもう一度試してください。');
+        }
         return;
       }
       if(a==='preview'){ try{ persist(); _twOpenOverlay(_twPagesFor(rec.date, rec.groups), {mode:'draft', recId:rec.id, date:rec.date, edits:rec.edits, meta:{delivDate:rec.delivDate, gikyo:rec.gikyo, tax:rec.tax}}); }catch(e){ console.error(e); if(typeof toast==='function')toast('プレビュー作成に失敗しました'); } return; }
