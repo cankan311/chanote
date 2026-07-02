@@ -4343,6 +4343,7 @@ var analyzeYear = 'all';
 var analyzeSeason = 'all';
 var analyzeDay = 'all';
 var analyzeProducer = 'all';
+var analyzeBuyer = 'all';
 var analyzeTab = 'summary'; // 'summary' | 'graph' | 'forecast'
 
 function showAnalyzeTab(tab){
@@ -4373,6 +4374,7 @@ function getFilteredTrades(){
   return trades.filter(function(t){
     if(isDemono(t)) return false; // 出物は分析・平均・成分など全集計から除外（データの信憑性確保）
     if(analyzeProducer !== 'all' && t.producerId !== parseInt(analyzeProducer)) return false;
+    if(analyzeBuyer !== 'all' && String(t.buyerId) !== String(analyzeBuyer)) return false;
     if(analyzeDay !== 'all'){ return t.date === analyzeDay; }
     if(analyzeYear !== 'all' && (!t.date || t.date.slice(0,4) !== analyzeYear)) return false;
     if(analyzeSeason !== 'all' && t.season !== analyzeSeason) return false;
@@ -4396,6 +4398,10 @@ function onAnalyzeDayChange(val){
 }
 function onAnalyzeProducerChange(val){
   analyzeProducer = val || 'all';
+  renderAnalyze();
+}
+function onAnalyzeBuyerChange(val){
+  analyzeBuyer = val || 'all';
   renderAnalyze();
 }
 
@@ -4664,21 +4670,17 @@ function renderAnalyze(){
       }
     } else if(id==='pgraph'){
       if(producers.length&&ftrades.length){
-        h+='<div class="section-label">'+(analyzeChartMode==='buyer'?'茶商別':'生産家別')+' 価格・数量グラフ</div>';
-        h+='<div class="seg" style="display:flex;gap:3px;background:var(--paper2);padding:3px;border-radius:11px;margin-bottom:10px;">'
-          +'<button onclick="setAnalyzeChartMode(\'producer\')" style="flex:1;padding:8px 2px;font-size:12px;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;'+(analyzeChartMode!=='buyer'?'background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);':'background:transparent;color:var(--muted);')+'">生産家別</button>'
-          +'<button onclick="setAnalyzeChartMode(\'buyer\')" style="flex:1;padding:8px 2px;font-size:12px;font-weight:700;border-radius:9px;border:none;cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;'+(analyzeChartMode==='buyer'?'background:var(--surface);color:var(--matcha);box-shadow:var(--shadow-sm);':'background:transparent;color:var(--muted);')+'">茶商別</button>'
-        +'</div>';
-        h+='<div class="card" style="margin-bottom:14px;">'+(analyzeChartMode==='buyer'?'':producerSelectHtml);
+        h+='<div class="section-label">生産家別 価格・数量グラフ</div>';
+        h+='<div class="card" style="margin-bottom:14px;">'+producerSelectHtml;
         h+='<div style="margin-top:14px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">価格推移（円/kg）― '+(analyzeChartMode==='buyer'?'茶商（売り先）別':'売り先・品種別')+'</span>';
+        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">価格推移（円/kg）― 売り先・品種別</span>';
         h+='<button onclick="resetPriceZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
         h+='<div style="position:relative;height:300px;"><div id="producer-price-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
         h+='<div style="margin-top:16px;">';
         h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">数量推移（kg）― '+(analyzeChartMode==='buyer'?'生産家・品種別':'売り先・品種別')+'</span>';
+        h+='<span style="font-size:11px;color:var(--muted);font-weight:500;">数量推移（kg）― 売り先・品種別</span>';
         h+='<button onclick="resetQtyZoom()" style="font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">↺ リセット</button>';
         h+='</div>';
         h+='<div style="position:relative;height:280px;"><div id="producer-qty-chart" data-ec style="width:100%;height:100%;"></div></div></div>';
@@ -4743,6 +4745,12 @@ function renderAnalyze(){
   var _sortedP=_prods.slice().sort(function(a,b){ return (_hasData[a.id]?0:1)-(_hasData[b.id]?0:1); });
   var producerFilterOpts='<option value="all"'+(analyzeProducer==='all'?' selected':'')+'>全生産家</option>'
     + _sortedP.map(function(p){ return '<option value="'+p.id+'"'+(String(analyzeProducer)===String(p.id)?' selected':'')+'>'+p.name+(_hasData[p.id]?'':'（データなし）')+'</option>'; }).join('');
+  // 茶商フィルター用の選択肢（取引のある茶商を上に）
+  var _chashos = partners.filter(function(p){return p.type==='chasho';});
+  var _hasBData={}; trades.forEach(function(t){ if(t.buyerId) _hasBData[String(t.buyerId)]=1; });
+  var _sortedB=_chashos.slice().sort(function(a,b){ return (_hasBData[String(a.id)]?0:1)-(_hasBData[String(b.id)]?0:1); });
+  var buyerFilterOpts='<option value="all"'+(analyzeBuyer==='all'?' selected':'')+'>全茶商</option>'
+    + _sortedB.map(function(p){ return '<option value="'+p.id+'"'+(String(analyzeBuyer)===String(p.id)?' selected':'')+'>'+p.name+(_hasBData[String(p.id)]?'':'（データなし）')+'</option>'; }).join('');
   var dayVal = analyzeDay!=='all' ? analyzeDay : '';
   var filterHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'
@@ -4758,13 +4766,16 @@ function renderAnalyze(){
     +'</div></div>'
     +'<div style="margin-bottom:14px;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">🌿 生産家（特定の生産家で絞り込み）</label>'
     +'<select onchange="onAnalyzeProducerChange(this.value)" style="width:100%;padding:9px 12px;font-size:14px;border:1.5px solid '+(analyzeProducer!=='all'?'var(--matcha-mid)':'var(--border)')+';border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;appearance:auto;">'+producerFilterOpts+'</select></div>'
-    +(analyzeYear!=='all'||analyzeSeason!=='all'||analyzeDay!=='all'||analyzeProducer!=='all'
+    +'<div style="margin-bottom:14px;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.06em;">🏪 茶商（特定の茶商で絞り込み）</label>'
+    +'<select onchange="onAnalyzeBuyerChange(this.value)" style="width:100%;padding:9px 12px;font-size:14px;border:1.5px solid '+(analyzeBuyer!=='all'?'var(--matcha-mid)':'var(--border)')+';border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-family:\'Noto Sans JP\',sans-serif;outline:none;appearance:auto;">'+buyerFilterOpts+'</select></div>'
+    +(analyzeYear!=='all'||analyzeSeason!=='all'||analyzeDay!=='all'||analyzeProducer!=='all'||analyzeBuyer!=='all'
       ? '<div style="background:var(--matcha-light);border:1px solid var(--matcha-mid);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:12px;color:var(--matcha);font-weight:600;display:flex;justify-content:space-between;align-items:center;">'
         +'<span>🔍 '
           +(analyzeProducer!=='all'?((partners.find(function(p){return String(p.id)===String(analyzeProducer);})||{}).name||'')+' ':'')
+          +(analyzeBuyer!=='all'?'→'+(((partners.find(function(p){return String(p.id)===String(analyzeBuyer);})||{}).name)||'')+' ':'')
           +(analyzeDay!=='all'?analyzeDay+' の1日':((analyzeYear!=='all'?analyzeYear+'年 ':'')+(analyzeSeason!=='all'?analyzeSeason:'')))
           +'のデータを表示中</span>'
-        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';analyzeDay=\'all\';analyzeProducer=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
+        +'<button onclick="analyzeYear=\'all\';analyzeSeason=\'all\';analyzeDay=\'all\';analyzeProducer=\'all\';analyzeBuyer=\'all\';renderAnalyze();" style="font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid var(--matcha);background:transparent;color:var(--matcha);cursor:pointer;font-family:\'Noto Sans JP\',sans-serif;">✕ 解除</button>'
         +'</div>'
       : '');
 
@@ -5248,12 +5259,7 @@ var _qtyChartInstance   = null;
 var analyzeChartMode='producer';
 function setAnalyzeChartMode(m){ analyzeChartMode=m; renderAnalyze(); }
 function renderProducerCharts(){
-  if(analyzeChartMode==='buyer'){
-    var ft=getFilteredTrades().filter(function(t){ var b=partners.find(function(p){return p.id===t.buyerId;}); return b && b.type==='chasho'; });
-    renderAllProducersCharts(ft, true);
-  } else {
-    renderProducerChartsEc();
-  }
+  renderProducerChartsEc();
 }
 
 function resetPriceZoom(){ ecResetZoom('producer-price-chart'); }
