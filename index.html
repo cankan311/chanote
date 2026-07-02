@@ -6107,6 +6107,8 @@ function renderCompChart(){
   var metric=window._compMetric||'窒素';
   var ft=getFilteredTrades().filter(function(t){
     if(metric==='price') return (t.totalQty||0)>0;
+    // 成分分析はハラダ製茶のみ実施 → ハラダ行き（出物除く）だけを反映
+    if(String(t.buyerId)!==String(HARADA_BUYER_ID) || isDemono(t)) return false;
     return t.components && t.components[metric]!=null && !isNaN(t.components[metric]);
   });
   if(!ft.length){ c.setOption({title:{text:'この条件のデータがありません',left:'center',top:'middle',textStyle:{fontSize:12,color:'#a8a098',fontFamily:EC_FONT}}}); return; }
